@@ -10,18 +10,19 @@ import (
 	"testing"
 	"time"
 
+	keptnutils "github.com/keptn/go-utils/pkg/utils"
+
+	"github.com/kelseyhightower/envconfig"
+
 	"github.com/cloudevents/sdk-go/pkg/cloudevents"
 	"github.com/cloudevents/sdk-go/pkg/cloudevents/client"
 	cloudeventshttp "github.com/cloudevents/sdk-go/pkg/cloudevents/transport/http"
-	"github.com/kelseyhightower/envconfig"
-	keptnutils "github.com/keptn/go-utils/pkg/utils"
+
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 
-	commonopts "github.com/mongodb/mongo-tools/common/options"
 	md "github.com/mongodb/mongo-tools/mongodump"
-	mdopts "github.com/mongodb/mongo-tools/mongodump/options"
 	mr "github.com/mongodb/mongo-tools/mongorestore"
 )
 
@@ -37,7 +38,7 @@ var (
 	testDb2                   = "carts-db-test-2"
 	defaultHost               = "localhost"
 	defaultPort               = "27017"
-	dumpDirAllCollections     = "C:/Users/sara/Desktop/mongoExports/dumpAllCollections"
+	dumpDirAllCollections     = "/mounted/dumpAllCollections"
 	dumpDirSpecificCollection = "C:/Users/sara/Desktop/mongoExports/dumpSpecificCollection"
 	itemsCol                  = "items"
 	categoriesCol             = "categories"
@@ -275,7 +276,7 @@ func assertDatabaseConsistency(dbInfo *DatabaseInfo) error {
 		return fmt.Errorf("specified collection was not dumped")
 	}
 	if dbInfo.collection == "" && numCollections != len(collectionNames) {
-		return fmt.Errorf("dumped and restored collections do not correspond!")
+		return fmt.Errorf("dumped and restored collections do not correspond")
 	}
 	fmt.Println("Found all collections in dump directory!")
 	return nil
