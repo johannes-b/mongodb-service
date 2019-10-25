@@ -66,7 +66,7 @@ func gotEvent(ctx context.Context, event cloudevents.Event) error {
 	var shkeptncontext string
 	event.Context.ExtensionAs("shkeptncontext", &shkeptncontext)
 
-	go syncTestDB(event, shkeptncontext, logger)
+	go syncTestDB(event, shkeptncontext)
 
 	return nil
 }
