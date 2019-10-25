@@ -69,7 +69,6 @@
   version = "v1.4.0"
 
 [[projects]]
-  branch = "v4.2"
   digest = "1:c7fdc4a83b03a18aa3849cb1ab41c74e81ea37db40cb6343296db05bd5ca9235"
   name = "github.com/mongodb/mongo-tools"
   packages = [
@@ -79,6 +78,7 @@
   ]
   pruneopts = "UT"
   revision = "976b41822808521389218141029f3cf786cdefc9"
+  version = "r4.2.1"
 
 [[projects]]
   digest = "1:c0e95b157e1eaa3d8033651c339b4d25aef6943fb3a8597e57e5ac6cef3fe615"
