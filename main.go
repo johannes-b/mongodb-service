@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	keptnutils "github.com/keptn/go-utils/pkg/utils"
-
 	"github.com/kelseyhightower/envconfig"
 
 	"github.com/cloudevents/sdk-go/pkg/cloudevents"
@@ -22,8 +20,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 
-	md "github.com/mongodb/mongo-tools/mongodump"
-	mr "github.com/mongodb/mongo-tools/mongorestore"
+	//md "github.com/mongodb/mongo-tools/mongodump"
+	//mr "github.com/mongodb/mongo-tools/mongorestore"
 )
 
 type envConfig struct {
@@ -67,14 +65,13 @@ func main() {
 func gotEvent(ctx context.Context, event cloudevents.Event) error {
 	var shkeptncontext string
 	event.Context.ExtensionAs("shkeptncontext", &shkeptncontext)
-	logger := keptnutils.NewLogger(shkeptncontext, event.Context.GetID(), "mongodb-service")
 
 	go syncTestDB(event, shkeptncontext, logger)
 
 	return nil
 }
 
-func syncTestDB(event cloudevents.Event, shkeptncontext string, logger *keptnutils.Logger) {
+func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 	fmt.Println("here comes the business logic to dump/restore test db")
 }
 

@@ -32,17 +32,13 @@
   name = "github.com/kelseyhightower/envconfig"
   version = "1.4.0"
 
-[[constraint]]
-  name = "github.com/keptn/go-utils"
-  branch = "develop"
-  
 [[override]]
   name = "go.mongodb.org/mongo-driver"
   version = "^1.1.2"
 
 [[override]]
   name = "github.com/mongodb/mongo-tools"
-  branch = "v4.2-master"
+  version = "^4.2.1"
 
 [prune]
   go-tests = true
