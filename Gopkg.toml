@@ -38,7 +38,7 @@
 
 [[override]]
   name = "github.com/mongodb/mongo-tools"
-  version = "^4.2.1"
+  branch = "v4.2"
 
 [prune]
   go-tests = true

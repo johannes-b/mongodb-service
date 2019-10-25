@@ -20,8 +20,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 
-	//md "github.com/mongodb/mongo-tools/mongodump"
-	//mr "github.com/mongodb/mongo-tools/mongorestore"
+	md "github.com/mongodb/mongo-tools/mongodump"
+	mr "github.com/mongodb/mongo-tools/mongorestore"
 )
 
 type envConfig struct {
