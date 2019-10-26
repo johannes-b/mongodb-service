@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -32,27 +34,26 @@ type envConfig struct {
 }
 
 var (
-	prodDb                    = "carts-db"
-	testDb                    = "carts-db-test"
-	testDb2                   = "carts-db-test-2"
-	defaultHost               = "localhost"
-	defaultPort               = "27017"
-	dumpDirAllCollections     = "./dumpdir/dumpAllCollections"
-	dumpDirSpecificCollection = "./dumpdir/dumpSpecificCollection"
-	itemsCol                  = "items"
-	categoriesCol             = "categories"
-	timeout                   = 10 * time.Second
-	dropDatabase              = true
+	cartsDB                    = "carts-db"
+	defaultHost                = "localhost"
+	defaultPort                = "27017"
+	dumpDirAllCollections      = "./dumpdir/dumpDirAllCollections"
+	dumpDirOneCollection       = "./dumpdir/dumpDirOneCollection"
+	dumpDirMultipleCollections = "./dumpdir/dumpDirMultipleCollections"
+	itemsCol                   = "items"
+	categoriesCol              = "categories"
+	timeout                    = 10 * time.Second
 )
 
 // DatabaseInfo groups information from a database.
 type DatabaseInfo struct {
-	name       string
-	host       string
-	port       string
-	dumpDir    string
-	sourceDB   string
-	collection string
+	name        string
+	host        string
+	port        string
+	dumpDir     string
+	sourceDB    string
+	collections []string
+	args        []string
 }
 
 func main() {
@@ -112,8 +113,6 @@ func fail(err error, t *testing.T) {
 	t.Fail()
 }
 
-//------------ Mongo Dump --------------
-
 // getMongoDump returns an initialized MongoDump object.
 func getMongoDump(dbInfo *DatabaseInfo) *md.MongoDump {
 	connection := &commonopts.Connection{
@@ -136,10 +135,6 @@ func getMongoDump(dbInfo *DatabaseInfo) *md.MongoDump {
 		Out:                    dbInfo.dumpDir,
 	}
 
-	if dbInfo.collection != "" {
-		toolOptions.Namespace.Collection = dbInfo.collection
-	}
-
 	return &md.MongoDump{
 		ToolOptions:   toolOptions,
 		InputOptions:  inputOptions,
@@ -149,7 +144,31 @@ func getMongoDump(dbInfo *DatabaseInfo) *md.MongoDump {
 
 // executeMongoDump processes a mongodump operation.
 func executeMongoDump(dbInfo *DatabaseInfo) error {
+	if len(dbInfo.collections) == 0 { //dump all collections
+		fmt.Println("Dumping all collections from " + dbInfo.name)
+		err := initAndDump(dbInfo, "")
+		if err != nil {
+			return err
+		}
+	} else {
+		for _, col := range dbInfo.collections {
+			err := initAndDump(dbInfo, col)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	err := assertDatabaseConsistency(dbInfo)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// initAndDump initializes a MongoDump Object and restores collections.
+func initAndDump(dbInfo *DatabaseInfo, col string) error {
 	mongoDump := getMongoDump(dbInfo)
+	mongoDump.ToolOptions.Collection = col
 
 	err := mongoDump.Init()
 	if err != nil {
@@ -160,21 +179,11 @@ func executeMongoDump(dbInfo *DatabaseInfo) error {
 	if err != nil {
 		return err
 	}
-
-	err = assertDatabaseConsistency(dbInfo)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
-//------------ Mongo Restore --------------
-
 // getMongoRestore returns an initialized MongoRestore object.
-func getMongoRestore(targetDir string, database string) (*mr.MongoRestore, error) {
-	args := []string{
-		//mr.DropOption,
-	}
+func getMongoRestore(database string, targetDir string, args []string) (*mr.MongoRestore, error) {
 	opts, err := mr.ParseOptions(args, "", "")
 
 	if err != nil {
@@ -191,31 +200,39 @@ func getMongoRestore(targetDir string, database string) (*mr.MongoRestore, error
 }
 
 // executeMongoRestore processes a restore operation.
-func executeMongoRestore(dbInfo *DatabaseInfo, targetDir string) error {
-	restore, err := getMongoRestore(targetDir, dbInfo.name)
-	if err != nil {
-		return err
-	}
+func executeMongoRestore(dbInfo *DatabaseInfo) error {
 
-	if dropDatabase {
-		session, _ := restore.SessionProvider.GetSession()
-		db := session.Database(dbInfo.name)
-
-		err = db.Drop(nil)
+	if len(dbInfo.collections) == 0 {
+		targetDir := dbInfo.dumpDir + "/" + dbInfo.sourceDB
+		err := initAndRestore(dbInfo.name, targetDir, dbInfo.args)
 		if err != nil {
 			return err
 		}
-		fmt.Println("Database " + restore.NSOptions.DB + " dropped successfully!")
+	} else {
+		for _, col := range dbInfo.collections {
+			targetDir := dbInfo.dumpDir + "/" + dbInfo.sourceDB + "/" + col + ".bson"
+			err := initAndRestore(dbInfo.name, targetDir, dbInfo.args)
+			if err != nil {
+				return err
+			}
+		}
 	}
+	err := assertDatabaseConsistency(dbInfo)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
+// initAndRestore initializes a MongoRestore Object and restores collections.
+func initAndRestore(name string, targetDir string, args []string) error {
+	restore, err := getMongoRestore(name, targetDir, args)
+	if err != nil {
+		return err
+	}
 	result := restore.Restore()
 	if result.Err != nil {
 		return result.Err
-	}
-
-	err = assertDatabaseConsistency(dbInfo)
-	if err != nil {
-		return err
 	}
 	return nil
 }
@@ -225,27 +242,18 @@ func executeMongoRestore(dbInfo *DatabaseInfo, targetDir string) error {
 // assertDatabaseConsistency checks if all collections in the directory are
 // available also in the database.
 func assertDatabaseConsistency(dbInfo *DatabaseInfo) error {
-	ctx, _ := context.WithTimeout(context.Background(), timeout)
-	db, err := getDatabase(ctx, dbInfo)
-
+	collectionNamesDB, err := getCollectionNames(dbInfo)
 	if err != nil {
 		return err
 	}
 
-	collectionNames, err := db.ListCollectionNames(ctx, bson.M{})
-	if err != nil {
-		return err
-	}
-
-	files, err := ioutil.ReadDir(dbInfo.dumpDir + "/" + dbInfo.sourceDB)
+	files, err := getDumpedFiles(dbInfo)
 	if err != nil {
 		fmt.Println("An error occured while checking the files in the dump directory!")
 		return err
 	}
+	collectionNamesDump := make([]string, len(files)/2)
 
-	fmt.Println()
-	numCollections := 0
-	collection := ""
 	for i, file := range files {
 		if i%2 != 0 {
 			bsonFile := files[i-1].Name()
@@ -253,7 +261,7 @@ func assertDatabaseConsistency(dbInfo *DatabaseInfo) error {
 			containsBSON := false
 			containsJSON := false
 
-			for _, name := range collectionNames {
+			for _, name := range collectionNamesDB {
 				if bsonFile == (name + ".bson") {
 					containsBSON = true
 				}
@@ -261,24 +269,57 @@ func assertDatabaseConsistency(dbInfo *DatabaseInfo) error {
 					containsJSON = true
 				}
 			}
-			if (!containsBSON || !containsJSON) && dbInfo.collection == "" {
-				return fmt.Errorf("Could not find dumped files for " + bsonFile + " and " + jsonFile)
-			}
-			numCollections = numCollections + 1
-			collection = bsonFile[:strings.LastIndex(bsonFile, ".bson")]
-			fmt.Println("Found dumped files for collection " + collection + "!")
 
-			if dbInfo.collection == collection {
-				break
+			if containsBSON && containsJSON {
+				collection := bsonFile[:strings.LastIndex(bsonFile, ".bson")]
+				collectionNamesDump[i/2] = collection
 			}
 		}
 	}
-	if dbInfo.collection != "" && dbInfo.collection != collection {
-		return fmt.Errorf("specified collection was not dumped")
+
+	sort.Strings(collectionNamesDump)
+	sort.Strings(collectionNamesDB)
+
+	if len(dbInfo.collections) == 0 {
+		if !reflect.DeepEqual(collectionNamesDump, collectionNamesDB) {
+			return fmt.Errorf("not all collections were dumped/restored")
+		}
+	} else {
+		for _, col := range dbInfo.collections {
+			if !contains(collectionNamesDump, col) {
+				return fmt.Errorf("could not find collection " + col + "in dump directory")
+			}
+		}
 	}
-	if dbInfo.collection == "" && numCollections != len(collectionNames) {
-		return fmt.Errorf("dumped and restored collections do not correspond")
-	}
-	fmt.Println("Found all collections in dump directory!")
 	return nil
+}
+
+//getCollectionNames returns the collection names from a database.
+func getCollectionNames(dbInfo *DatabaseInfo) ([]string, error) {
+	ctx, _ := context.WithTimeout(context.Background(), timeout)
+	db, err := getDatabase(ctx, dbInfo)
+
+	if err != nil {
+		return nil, err
+	}
+	return db.ListCollectionNames(ctx, bson.M{})
+}
+
+// getFiles returns the files from a dump directory.
+func getDumpedFiles(dbInfo *DatabaseInfo) ([]os.FileInfo, error) {
+	dumpdir := dbInfo.dumpDir + "/" + dbInfo.name
+	if dbInfo.sourceDB != "" {
+		dumpdir = dbInfo.dumpDir + "/" + dbInfo.sourceDB
+	}
+	return ioutil.ReadDir(dumpdir)
+}
+
+//contains checks if the array contains a string.
+func contains(arr []string, s string) bool {
+	for _, n := range arr {
+		if s == n {
+			return true
+		}
+	}
+	return false
 }
