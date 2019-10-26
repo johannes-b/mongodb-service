@@ -261,6 +261,7 @@
     "github.com/cloudevents/sdk-go/pkg/cloudevents/client",
     "github.com/cloudevents/sdk-go/pkg/cloudevents/transport/http",
     "github.com/kelseyhightower/envconfig",
+    "github.com/mongodb/mongo-tools-common/options",
     "github.com/mongodb/mongo-tools/mongodump",
     "github.com/mongodb/mongo-tools/mongorestore",
     "go.mongodb.org/mongo-driver/mongo",

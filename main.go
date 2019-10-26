@@ -20,6 +20,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 
+	commonopts "github.com/mongodb/mongo-tools-common/options"
 	md "github.com/mongodb/mongo-tools/mongodump"
 	mr "github.com/mongodb/mongo-tools/mongorestore"
 )
@@ -36,8 +37,8 @@ var (
 	testDb2                   = "carts-db-test-2"
 	defaultHost               = "localhost"
 	defaultPort               = "27017"
-	dumpDirAllCollections     = "/mounted/dumpAllCollections"
-	dumpDirSpecificCollection = "C:/Users/sara/Desktop/mongoExports/dumpSpecificCollection"
+	dumpDirAllCollections     = "./dumpdir/dumpAllCollections"
+	dumpDirSpecificCollection = "./dumpdir/dumpSpecificCollection"
 	itemsCol                  = "items"
 	categoriesCol             = "categories"
 	timeout                   = 10 * time.Second
@@ -126,10 +127,13 @@ func getMongoDump(dbInfo *DatabaseInfo) *md.MongoDump {
 			Username: "",
 			Password: "",
 		},
+		URI: &commonopts.URI{},
 	}
-	inputOptions := &mdopts.InputOptions{}
-	outputOptions := &mdopts.OutputOptions{
-		Out: dbInfo.dumpDir,
+
+	inputOptions := &md.InputOptions{}
+	outputOptions := &md.OutputOptions{
+		NumParallelCollections: 1,
+		Out:                    dbInfo.dumpDir,
 	}
 
 	if dbInfo.collection != "" {
