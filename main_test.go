@@ -1,3 +1,5 @@
+// For the tests a mongo database named "carts-db" was created
+//containing the collections items, categories and users.
 package main
 
 import (
@@ -5,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	mr "github.com/mongodb/mongo-tools/mongorestore"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -14,7 +17,7 @@ func TestMongoDriver(t *testing.T) {
 
 	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	dbInfo := &DatabaseInfo{
-		name: prodDb,
+		name: cartsDB,
 		host: defaultHost,
 		port: defaultPort,
 	}
@@ -27,7 +30,6 @@ func TestMongoDriver(t *testing.T) {
 	if singleResult.Err() != nil {
 		fail(singleResult.Err(), t)
 	}
-	fmt.Println(singleResult.DecodeBytes())
 }
 
 // TestMongoDumpAllCollections executes mongo dump for all
@@ -36,11 +38,11 @@ func TestMongoDumpAllCollections(t *testing.T) {
 	fmt.Println("\n>> TestMongoDumpAllCollections()")
 
 	dbInfo := &DatabaseInfo{
-		name:     prodDb,
-		host:     defaultHost,
-		port:     defaultPort,
-		dumpDir:  dumpDirAllCollections,
-		sourceDB: prodDb,
+		name:        cartsDB,
+		host:        defaultHost,
+		port:        defaultPort,
+		dumpDir:     dumpDirAllCollections,
+		collections: []string{},
 	}
 	err := executeMongoDump(dbInfo)
 	if err != nil {
@@ -48,18 +50,40 @@ func TestMongoDumpAllCollections(t *testing.T) {
 	}
 }
 
-// TestMongoDumpSpecificCollection executes mongo dump for the
+// TestMongoDumpOneCollection executes mongo dump for the
 // categories collection.
-func TestMongoDumpSpecificCollection(t *testing.T) {
-	fmt.Println("\n>> TestMongoDumpSpecificCollection()")
+func TestMongoDumpOneCollection(t *testing.T) {
+	fmt.Println("\n>> TestMongoDumpOneCollection()")
 
 	dbInfo := &DatabaseInfo{
-		name:       prodDb,
-		host:       defaultHost,
-		port:       defaultPort,
-		dumpDir:    dumpDirSpecificCollection,
-		sourceDB:   prodDb,
-		collection: categoriesCol,
+		name:    cartsDB,
+		host:    defaultHost,
+		port:    defaultPort,
+		dumpDir: dumpDirOneCollection,
+		collections: []string{
+			itemsCol,
+		},
+	}
+	err := executeMongoDump(dbInfo)
+	if err != nil {
+		fail(err, t)
+	}
+}
+
+// TestMongoDumpMultipleCollections executes mongo dump for the
+// multiple collections.
+func TestMongoDumpMultipleCollections(t *testing.T) {
+	fmt.Println("\n>> TestMongoDumpMultipleCollections()")
+
+	dbInfo := &DatabaseInfo{
+		name:    cartsDB,
+		host:    defaultHost,
+		port:    defaultPort,
+		dumpDir: dumpDirMultipleCollections,
+		collections: []string{
+			itemsCol,
+			categoriesCol,
+		},
 	}
 	err := executeMongoDump(dbInfo)
 	if err != nil {
@@ -73,34 +97,64 @@ func TestMongoRestoreAllCollections(t *testing.T) {
 	fmt.Println("\n>> TestMongoRestoreAllCollections()")
 
 	dbInfo := &DatabaseInfo{
-		name:     testDb,
-		host:     defaultHost,
-		port:     defaultPort,
-		dumpDir:  dumpDirAllCollections,
-		sourceDB: prodDb,
+		name:        "carts-db-test",
+		host:        defaultHost,
+		port:        defaultPort,
+		dumpDir:     dumpDirAllCollections,
+		sourceDB:    cartsDB,
+		collections: []string{},
+		args: []string{
+			mr.DropOption,
+		},
 	}
-	targetDir := dbInfo.dumpDir + "/" + prodDb
-	err := executeMongoRestore(dbInfo, targetDir)
+	err := executeMongoRestore(dbInfo)
 	if err != nil {
 		fail(err, t)
 	}
 }
 
-// TestMongoRestoreSpecificCollection executes mongo restore for
+// TestMongoRestoreOneCollection executes mongo restore for
 // the categories collection.
-func TestMongoRestoreSpecificCollection(t *testing.T) {
-	fmt.Println("\n>> TestMongoRestoreSpecificCollection()")
+func TestMongoRestoreOneCollection(t *testing.T) {
+	fmt.Println("\n>> TestMongoRestoreOneCollection()")
 
 	dbInfo := &DatabaseInfo{
-		name:       testDb2,
-		host:       defaultHost,
-		port:       defaultPort,
-		dumpDir:    dumpDirAllCollections,
-		sourceDB:   prodDb,
-		collection: categoriesCol,
+		name:     "carts-db-test-2",
+		host:     defaultHost,
+		port:     defaultPort,
+		dumpDir:  dumpDirAllCollections,
+		sourceDB: cartsDB,
+		collections: []string{
+			itemsCol,
+		},
+		args: []string{
+			mr.DropOption,
+		},
 	}
-	targetDir := dbInfo.dumpDir + "/" + prodDb + "/" + dbInfo.collection + ".bson"
-	err := executeMongoRestore(dbInfo, targetDir)
+	err := executeMongoRestore(dbInfo)
+	if err != nil {
+		fail(err, t)
+	}
+}
+
+// TestMongoRestoreMultipleCollection executes mongo restore for
+// the categories collection.
+func TestMongoRestoreMultipleCollection(t *testing.T) {
+	fmt.Println("\n>> TestMongoRestoreMultipleCollection()")
+
+	dbInfo := &DatabaseInfo{
+		name:     "carts-db-test-3",
+		host:     defaultHost,
+		port:     defaultPort,
+		dumpDir:  dumpDirAllCollections,
+		sourceDB: cartsDB,
+		collections: []string{
+			itemsCol,
+			categoriesCol,
+		},
+		args: []string{},
+	}
+	err := executeMongoRestore(dbInfo)
 	if err != nil {
 		fail(err, t)
 	}
