@@ -24,9 +24,9 @@ func TestMongoDriver(t *testing.T) {
 
 	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	dbInfo := &DatabaseInfo{
-		name: cartsDB,
-		host: defaultHost,
-		port: defaultPort,
+		sourceDB: cartsDB,
+		host:     defaultHost,
+		port:     defaultPort,
 	}
 	db, err := getDatabase(ctx, dbInfo)
 	if err != nil {
@@ -47,14 +47,13 @@ func TestMongoDumpAllCollections(t *testing.T) {
 	setEnvironmentVariables(t)
 
 	dbInfo := &DatabaseInfo{
-		name:        cartsDB,
+		sourceDB:    cartsDB,
 		host:        defaultHost,
 		port:        defaultPort,
 		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
 		collections: []string{},
 	}
-	err := executeMongoDump(dbInfo)
-	if err != nil {
+	if err := executeMongoDump(dbInfo); err != nil {
 		fail(err, t)
 	}
 }
@@ -75,8 +74,7 @@ func TestMongoDumpOneCollection(t *testing.T) {
 			itemsCol,
 		},
 	}
-	err := executeMongoDump(dbInfo)
-	if err != nil {
+	if err := executeMongoDump(dbInfo); err != nil {
 		fail(err, t)
 	}
 }
@@ -98,8 +96,7 @@ func TestMongoDumpMultipleCollections(t *testing.T) {
 			categoriesCol,
 		},
 	}
-	err := executeMongoDump(dbInfo)
-	if err != nil {
+	if err := executeMongoDump(dbInfo); err != nil {
 		fail(err, t)
 	}
 }
@@ -112,18 +109,17 @@ func TestMongoRestoreAllCollections(t *testing.T) {
 	setEnvironmentVariables(t)
 
 	dbInfo := &DatabaseInfo{
-		name:        "carts-db-test",
+		sourceDB:    cartsDB,
+		targetDB:    "carts-db-test",
 		host:        defaultHost,
 		port:        defaultPort,
 		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
-		sourceDB:    cartsDB,
 		collections: []string{},
 		args: []string{
 			mr.DropOption,
 		},
 	}
-	err := executeMongoRestore(dbInfo)
-	if err != nil {
+	if err := executeMongoRestore(dbInfo); err != nil {
 		fail(err, t)
 	}
 }
@@ -136,11 +132,11 @@ func TestMongoRestoreOneCollection(t *testing.T) {
 	setEnvironmentVariables(t)
 
 	dbInfo := &DatabaseInfo{
-		name:     "carts-db-test-2",
+		sourceDB: cartsDB,
+		targetDB: "carts-db-test-2",
 		host:     defaultHost,
 		port:     defaultPort,
 		dumpDir:  os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
-		sourceDB: cartsDB,
 		collections: []string{
 			itemsCol,
 		},
@@ -148,8 +144,7 @@ func TestMongoRestoreOneCollection(t *testing.T) {
 			mr.DropOption,
 		},
 	}
-	err := executeMongoRestore(dbInfo)
-	if err != nil {
+	if err := executeMongoRestore(dbInfo); err != nil {
 		fail(err, t)
 	}
 }
@@ -162,19 +157,42 @@ func TestMongoRestoreMultipleCollection(t *testing.T) {
 	setEnvironmentVariables(t)
 
 	dbInfo := &DatabaseInfo{
-		name:     "carts-db-test-3",
+		sourceDB: cartsDB,
+		targetDB: "carts-db-test-3",
 		host:     defaultHost,
 		port:     defaultPort,
 		dumpDir:  os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
-		sourceDB: cartsDB,
 		collections: []string{
 			itemsCol,
 			categoriesCol,
 		},
 		args: []string{},
 	}
-	err := executeMongoRestore(dbInfo)
-	if err != nil {
+	if err := executeMongoRestore(dbInfo); err != nil {
+		fail(err, t)
+	}
+}
+
+// TestSync executes a synchronization of two databases
+//(dump and restore operation).
+func TestSync(t *testing.T) {
+	fmt.Println("\n>> TestSync()")
+
+	dbInfo := &DatabaseInfo{
+		sourceDB:    cartsDB,
+		targetDB:    "carts-db-test-4",
+		host:        defaultHost,
+		port:        defaultPort,
+		dumpDir:     dumpDirAllCollections,
+		collections: []string{},
+		args: []string{
+			mr.DropOption,
+		},
+	}
+	if err := executeMongoDump(dbInfo); err != nil {
+		fail(err, t)
+	}
+	if err := executeMongoRestore(dbInfo); err != nil {
 		fail(err, t)
 	}
 }
