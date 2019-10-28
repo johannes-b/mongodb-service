@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -17,6 +18,7 @@ import (
 	"github.com/cloudevents/sdk-go/pkg/cloudevents"
 	"github.com/cloudevents/sdk-go/pkg/cloudevents/client"
 	cloudeventshttp "github.com/cloudevents/sdk-go/pkg/cloudevents/transport/http"
+	keptnevents "github.com/keptn/go-utils/pkg/events"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -47,11 +49,12 @@ var (
 
 // DatabaseInfo groups information from a database.
 type DatabaseInfo struct {
+	sourceDB    string
+	targetDB    string
 	name        string
 	host        string
 	port        string
 	dumpDir     string
-	sourceDB    string
 	collections []string
 	args        []string
 }
@@ -68,13 +71,35 @@ func gotEvent(ctx context.Context, event cloudevents.Event) error {
 	var shkeptncontext string
 	event.Context.ExtensionAs("shkeptncontext", &shkeptncontext)
 
+	if event.Type() != keptnevents.ConfigurationChangeEventType {
+		const errorMsg = "Received unexpected keptn event"
+		return errors.New(errorMsg)
+	}
+
 	go syncTestDB(event, shkeptncontext)
 
 	return nil
 }
 
 func syncTestDB(event cloudevents.Event, shkeptncontext string) {
-	fmt.Println("here comes the business logic to dump/restore test db")
+
+	dbInfo := &DatabaseInfo{
+		sourceDB:    cartsDB,
+		targetDB:    "carts-db-test-4",
+		host:        defaultHost,
+		port:        defaultPort,
+		dumpDir:     dumpDirAllCollections,
+		collections: []string{},
+		args: []string{
+			mr.DropOption,
+		},
+	}
+	if err := executeMongoDump(dbInfo); err != nil {
+		//TODO
+	}
+	if err := executeMongoRestore(dbInfo); err != nil {
+		//TODO
+	}
 }
 
 func _main(args []string, env envConfig) int {
@@ -105,7 +130,7 @@ func getDatabase(ctx context.Context, dbInfo *DatabaseInfo) (*mongo.Database, er
 	if err != nil {
 		return nil, err
 	}
-	return client.Database(dbInfo.name), nil
+	return client.Database(dbInfo.sourceDB), nil
 }
 
 func fail(err error, t *testing.T) {
@@ -121,7 +146,7 @@ func getMongoDump(dbInfo *DatabaseInfo) *md.MongoDump {
 	}
 	toolOptions := &commonopts.ToolOptions{
 		Connection: connection,
-		Namespace:  &commonopts.Namespace{DB: dbInfo.name},
+		Namespace:  &commonopts.Namespace{DB: dbInfo.sourceDB},
 		Auth: &commonopts.Auth{
 			Username: "",
 			Password: "",
@@ -145,21 +170,18 @@ func getMongoDump(dbInfo *DatabaseInfo) *md.MongoDump {
 // executeMongoDump processes a mongodump operation.
 func executeMongoDump(dbInfo *DatabaseInfo) error {
 	if len(dbInfo.collections) == 0 { //dump all collections
-		fmt.Println("Dumping all collections from " + dbInfo.name)
-		err := initAndDump(dbInfo, "")
-		if err != nil {
+		fmt.Println("Dumping all collections from " + dbInfo.sourceDB)
+		if err := initAndDump(dbInfo, ""); err != nil {
 			return err
 		}
 	} else {
 		for _, col := range dbInfo.collections {
-			err := initAndDump(dbInfo, col)
-			if err != nil {
+			if err := initAndDump(dbInfo, col); err != nil {
 				return err
 			}
 		}
 	}
-	err := assertDatabaseConsistency(dbInfo)
-	if err != nil {
+	if err := assertDatabaseConsistency(dbInfo); err != nil {
 		return err
 	}
 	return nil
@@ -170,13 +192,10 @@ func initAndDump(dbInfo *DatabaseInfo, col string) error {
 	mongoDump := getMongoDump(dbInfo)
 	mongoDump.ToolOptions.Collection = col
 
-	err := mongoDump.Init()
-	if err != nil {
+	if err := mongoDump.Init(); err != nil {
 		return err
 	}
-
-	err = mongoDump.Dump()
-	if err != nil {
+	if err := mongoDump.Dump(); err != nil {
 		return err
 	}
 	return nil
@@ -204,34 +223,30 @@ func executeMongoRestore(dbInfo *DatabaseInfo) error {
 
 	if len(dbInfo.collections) == 0 {
 		targetDir := dbInfo.dumpDir + "/" + dbInfo.sourceDB
-		err := initAndRestore(dbInfo.name, targetDir, dbInfo.args)
-		if err != nil {
+		if err := initAndRestore(dbInfo.targetDB, targetDir, dbInfo.args); err != nil {
 			return err
 		}
 	} else {
 		for _, col := range dbInfo.collections {
 			targetDir := dbInfo.dumpDir + "/" + dbInfo.sourceDB + "/" + col + ".bson"
-			err := initAndRestore(dbInfo.name, targetDir, dbInfo.args)
-			if err != nil {
+			if err := initAndRestore(dbInfo.targetDB, targetDir, dbInfo.args); err != nil {
 				return err
 			}
 		}
 	}
-	err := assertDatabaseConsistency(dbInfo)
-	if err != nil {
+	if err := assertDatabaseConsistency(dbInfo); err != nil {
 		return err
 	}
 	return nil
 }
 
 // initAndRestore initializes a MongoRestore Object and restores collections.
-func initAndRestore(name string, targetDir string, args []string) error {
-	restore, err := getMongoRestore(name, targetDir, args)
+func initAndRestore(dbname string, targetDir string, args []string) error {
+	restore, err := getMongoRestore(dbname, targetDir, args)
 	if err != nil {
 		return err
 	}
-	result := restore.Restore()
-	if result.Err != nil {
+	if result := restore.Restore(); result.Err != nil {
 		return result.Err
 	}
 	return nil
