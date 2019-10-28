@@ -32,9 +32,9 @@ spec:
         - name: DUMP_DIR_ONE_COLLECTION
           value: '/data/dumpdir/dumpDirOneCollection'
         - name: DUMP_DIR_MULTIPLE_COLLECTIONS
-          value: '/data/dumpdir/dumpDirAllCollections'
-        - name: DUMP_DIR_ALL_COLLECTIONS
           value: '/data/dumpdir/dumpDirMultipleCollections'
+        - name: DUMP_DIR_ALL_COLLECTIONS
+          value: '/data/dumpdir/dumpDirAllCollections'
       volumes:
       - name: mongodb-dump-volume
         persistentVolumeClaim:
