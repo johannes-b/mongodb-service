@@ -14,10 +14,31 @@ spec:
         run: mongodb-service
     spec:
       containers:
-      - name: helm-service
-        image: jbraeuer/mongodb-service:latest
+      - name: mongodb-service
+        image: jbraeuer/mongodb-service:0.0.2
         ports:
         - containerPort: 8080
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        volumeMounts:
+        - mountPath: /data/dumpdir
+          name: mongodb-dump-volume
+        env:
+        - name: DUMP_DIR_ONE_COLLECTION
+          value: '/data/dumpdir/dumpDirOneCollection'
+        - name: DUMP_DIR_MULTIPLE_COLLECTIONS
+          value: '/data/dumpdir/dumpDirAllCollections'
+        - name: DUMP_DIR_ALL_COLLECTIONS
+          value: '/data/dumpdir/dumpDirMultipleCollections'
+      volumes:
+      - name: mongodb-dump-volume
+        persistentVolumeClaim:
+          claimName: mongodb-dump-volume
 ---
 apiVersion: v1
 kind: Service

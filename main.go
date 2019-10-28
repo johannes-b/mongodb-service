@@ -36,15 +36,17 @@ type envConfig struct {
 }
 
 var (
-	cartsDB                    = "carts-db"
-	defaultHost                = "localhost"
-	defaultPort                = "27017"
-	dumpDirAllCollections      = "./dumpdir/dumpDirAllCollections"
-	dumpDirOneCollection       = "./dumpdir/dumpDirOneCollection"
-	dumpDirMultipleCollections = "./dumpdir/dumpDirMultipleCollections"
-	itemsCol                   = "items"
-	categoriesCol              = "categories"
-	timeout                    = 10 * time.Second
+	cartsDB       = "carts-db"
+	defaultHost   = "localhost"
+	defaultPort   = "27017"
+	itemsCol      = "items"
+	categoriesCol = "categories"
+	timeout       = 10 * time.Second
+
+	// environment variables defined in ./deploy/service.yaml
+	dumpDirOneCollection       = os.Getenv("DUMP_DIR_ONE_COLLECTION")
+	dumpDirMultipleCollections = os.Getenv("DUMP_DIR_MULTIPLE_COLLECTIONS")
+	dumpDirAllCollections      = os.Getenv("DUMP_DIR_ALL_COLLECTIONS")
 )
 
 // DatabaseInfo groups information from a database.
@@ -144,6 +146,7 @@ func getMongoDump(dbInfo *DatabaseInfo) *md.MongoDump {
 		Host: dbInfo.host,
 		Port: dbInfo.port,
 	}
+
 	toolOptions := &commonopts.ToolOptions{
 		Connection: connection,
 		Namespace:  &commonopts.Namespace{DB: dbInfo.sourceDB},

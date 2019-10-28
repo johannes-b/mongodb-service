@@ -5,11 +5,18 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	mr "github.com/mongodb/mongo-tools/mongorestore"
 	"gopkg.in/mgo.v2/bson"
 )
+
+func setEnvironmentVariables(t *testing.T) {
+	os.Setenv("DUMP_DIR_ONE_COLLECTION", "./dumpdir/dumpDirOneCollection")
+	os.Setenv("DUMP_DIR_MULTIPLE_COLLECTIONS", "./dumpdir/dumpDirMultipleCollections")
+	os.Setenv("DUMP_DIR_ALL_COLLECTIONS", "./dumpdir/dumpDirAllCollections")
+}
 
 // TestMongoDriver instantiates the mongo driver.
 func TestMongoDriver(t *testing.T) {
@@ -37,11 +44,13 @@ func TestMongoDriver(t *testing.T) {
 func TestMongoDumpAllCollections(t *testing.T) {
 	fmt.Println("\n>> TestMongoDumpAllCollections()")
 
+	setEnvironmentVariables(t)
+
 	dbInfo := &DatabaseInfo{
 		sourceDB:    cartsDB,
 		host:        defaultHost,
 		port:        defaultPort,
-		dumpDir:     dumpDirAllCollections,
+		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
 		collections: []string{},
 	}
 	if err := executeMongoDump(dbInfo); err != nil {
@@ -54,11 +63,13 @@ func TestMongoDumpAllCollections(t *testing.T) {
 func TestMongoDumpOneCollection(t *testing.T) {
 	fmt.Println("\n>> TestMongoDumpOneCollection()")
 
+	setEnvironmentVariables(t)
+
 	dbInfo := &DatabaseInfo{
 		sourceDB: cartsDB,
 		host:     defaultHost,
 		port:     defaultPort,
-		dumpDir:  dumpDirOneCollection,
+		dumpDir:  os.Getenv("DUMP_DIR_ONE_COLLECTION"),
 		collections: []string{
 			itemsCol,
 		},
@@ -73,11 +84,13 @@ func TestMongoDumpOneCollection(t *testing.T) {
 func TestMongoDumpMultipleCollections(t *testing.T) {
 	fmt.Println("\n>> TestMongoDumpMultipleCollections()")
 
+	setEnvironmentVariables(t)
+
 	dbInfo := &DatabaseInfo{
 		sourceDB: cartsDB,
 		host:     defaultHost,
 		port:     defaultPort,
-		dumpDir:  dumpDirMultipleCollections,
+		dumpDir:  os.Getenv("DUMP_DIR_MULTIPLE_COLLECTIONS"),
 		collections: []string{
 			itemsCol,
 			categoriesCol,
@@ -93,12 +106,14 @@ func TestMongoDumpMultipleCollections(t *testing.T) {
 func TestMongoRestoreAllCollections(t *testing.T) {
 	fmt.Println("\n>> TestMongoRestoreAllCollections()")
 
+	setEnvironmentVariables(t)
+
 	dbInfo := &DatabaseInfo{
 		sourceDB:    cartsDB,
 		targetDB:    "carts-db-test",
 		host:        defaultHost,
 		port:        defaultPort,
-		dumpDir:     dumpDirAllCollections,
+		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
 		collections: []string{},
 		args: []string{
 			mr.DropOption,
@@ -114,12 +129,14 @@ func TestMongoRestoreAllCollections(t *testing.T) {
 func TestMongoRestoreOneCollection(t *testing.T) {
 	fmt.Println("\n>> TestMongoRestoreOneCollection()")
 
+	setEnvironmentVariables(t)
+
 	dbInfo := &DatabaseInfo{
 		sourceDB: cartsDB,
 		targetDB: "carts-db-test-2",
 		host:     defaultHost,
 		port:     defaultPort,
-		dumpDir:  dumpDirAllCollections,
+		dumpDir:  os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
 		collections: []string{
 			itemsCol,
 		},
@@ -137,12 +154,14 @@ func TestMongoRestoreOneCollection(t *testing.T) {
 func TestMongoRestoreMultipleCollection(t *testing.T) {
 	fmt.Println("\n>> TestMongoRestoreMultipleCollection()")
 
+	setEnvironmentVariables(t)
+
 	dbInfo := &DatabaseInfo{
 		sourceDB: cartsDB,
 		targetDB: "carts-db-test-3",
 		host:     defaultHost,
 		port:     defaultPort,
-		dumpDir:  dumpDirAllCollections,
+		dumpDir:  os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
 		collections: []string{
 			itemsCol,
 			categoriesCol,

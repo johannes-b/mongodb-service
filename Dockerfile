@@ -24,7 +24,7 @@ FROM alpine
 RUN apk add --no-cache ca-certificates
 
 # Copy the binary to the production image from the builder stage.
-COPY --from=builder /go/src/github.com/keptn-contrib/mongodb-service /mongodb-service
+COPY --from=builder /go/src/github.com/keptn-contrib/mongodb-service/mongodb-service /mongodb-service
 ADD MANIFEST /
 
 # Run the web service on container startup.
