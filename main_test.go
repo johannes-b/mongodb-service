@@ -66,10 +66,10 @@ func TestMongoDumpOneCollection(t *testing.T) {
 	setEnvironmentVariables(t)
 
 	dbInfo := &DatabaseInfo{
-		name:    cartsDB,
-		host:    defaultHost,
-		port:    defaultPort,
-		dumpDir: os.Getenv("DUMP_DIR_ONE_COLLECTION"),
+		sourceDB: cartsDB,
+		host:     defaultHost,
+		port:     defaultPort,
+		dumpDir:  os.Getenv("DUMP_DIR_ONE_COLLECTION"),
 		collections: []string{
 			itemsCol,
 		},
@@ -87,10 +87,10 @@ func TestMongoDumpMultipleCollections(t *testing.T) {
 	setEnvironmentVariables(t)
 
 	dbInfo := &DatabaseInfo{
-		name:    cartsDB,
-		host:    defaultHost,
-		port:    defaultPort,
-		dumpDir: os.Getenv("DUMP_DIR_MULTIPLE_COLLECTIONS"),
+		sourceDB: cartsDB,
+		host:     defaultHost,
+		port:     defaultPort,
+		dumpDir:  os.Getenv("DUMP_DIR_MULTIPLE_COLLECTIONS"),
 		collections: []string{
 			itemsCol,
 			categoriesCol,
