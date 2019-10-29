@@ -53,7 +53,6 @@ var (
 type DatabaseInfo struct {
 	sourceDB    string
 	targetDB    string
-	name        string
 	host        string
 	port        string
 	dumpDir     string
@@ -325,10 +324,7 @@ func getCollectionNames(dbInfo *DatabaseInfo) ([]string, error) {
 
 // getFiles returns the files from a dump directory.
 func getDumpedFiles(dbInfo *DatabaseInfo) ([]os.FileInfo, error) {
-	dumpdir := dbInfo.dumpDir + "/" + dbInfo.name
-	if dbInfo.sourceDB != "" {
-		dumpdir = dbInfo.dumpDir + "/" + dbInfo.sourceDB
-	}
+	dumpdir := dbInfo.dumpDir + "/" + dbInfo.sourceDB
 	return ioutil.ReadDir(dumpdir)
 }
 

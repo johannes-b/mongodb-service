@@ -110,7 +110,7 @@ func TestMongoRestoreAllCollections(t *testing.T) {
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    cartsDB,
-		targetDB:    "carts-db-test",
+		targetDB:    "carts-db-test-1",
 		host:        defaultHost,
 		port:        defaultPort,
 		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
@@ -136,7 +136,7 @@ func TestMongoRestoreOneCollection(t *testing.T) {
 		targetDB: "carts-db-test-2",
 		host:     defaultHost,
 		port:     defaultPort,
-		dumpDir:  os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
+		dumpDir:  os.Getenv("DUMP_DIR_ONE_COLLECTION"),
 		collections: []string{
 			itemsCol,
 		},
@@ -151,8 +151,8 @@ func TestMongoRestoreOneCollection(t *testing.T) {
 
 // TestMongoRestoreMultipleCollection executes mongo restore for
 // the categories collection.
-func TestMongoRestoreMultipleCollection(t *testing.T) {
-	fmt.Println("\n>> TestMongoRestoreMultipleCollection()")
+func TestMongoRestoreMultipleCollections(t *testing.T) {
+	fmt.Println("\n>> TestMongoRestoreMultipleCollections()")
 
 	setEnvironmentVariables(t)
 
@@ -161,7 +161,7 @@ func TestMongoRestoreMultipleCollection(t *testing.T) {
 		targetDB: "carts-db-test-3",
 		host:     defaultHost,
 		port:     defaultPort,
-		dumpDir:  os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
+		dumpDir:  os.Getenv("DUMP_DIR_MULTIPLE_COLLECTIONS"),
 		collections: []string{
 			itemsCol,
 			categoriesCol,
@@ -175,15 +175,17 @@ func TestMongoRestoreMultipleCollection(t *testing.T) {
 
 // TestSync executes a synchronization of two databases
 //(dump and restore operation).
-func TestSync(t *testing.T) {
-	fmt.Println("\n>> TestSync()")
+func TestDatabaseSync(t *testing.T) {
+	fmt.Println("\n>> TestDatabaseSync()")
+
+	setEnvironmentVariables(t)
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    cartsDB,
 		targetDB:    "carts-db-test-4",
 		host:        defaultHost,
 		port:        defaultPort,
-		dumpDir:     dumpDirAllCollections,
+		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
 		collections: []string{},
 		args: []string{
 			mr.DropOption,
