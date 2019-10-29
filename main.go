@@ -19,6 +19,7 @@ import (
 	"github.com/cloudevents/sdk-go/pkg/cloudevents/client"
 	cloudeventshttp "github.com/cloudevents/sdk-go/pkg/cloudevents/transport/http"
 	keptnevents "github.com/keptn/go-utils/pkg/events"
+	keptnutils "github.com/keptn/go-utils/pkg/utils"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -83,6 +84,9 @@ func gotEvent(ctx context.Context, event cloudevents.Event) error {
 }
 
 func syncTestDB(event cloudevents.Event, shkeptncontext string) {
+
+	stdLogger := keptnutils.NewLogger(shkeptncontext, event.Context.GetID(), "mongodb-service")
+	stdLogger.Debug("my first log message")
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    cartsDB,
