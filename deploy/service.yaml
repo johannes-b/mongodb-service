@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: mongodb-service
-        image: jbraeuer/mongodb-service:0.0.2
+        image: jbraeuer/mongodb-service:latest
         ports:
         - containerPort: 8080
         resources:
@@ -28,13 +28,9 @@ spec:
         volumeMounts:
         - mountPath: /data/dumpdir
           name: mongodb-dump-volume
-        env:
-        - name: DUMP_DIR_ONE_COLLECTION
-          value: '/data/dumpdir/dumpDirOneCollection'
-        - name: DUMP_DIR_MULTIPLE_COLLECTIONS
-          value: '/data/dumpdir/dumpDirMultipleCollections'
-        - name: DUMP_DIR_ALL_COLLECTIONS
-          value: '/data/dumpdir/dumpDirAllCollections'
+        envFrom:
+        - configMapRef:
+            name: mongodb-service-config
       volumes:
       - name: mongodb-dump-volume
         persistentVolumeClaim:
