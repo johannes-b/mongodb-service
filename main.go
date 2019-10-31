@@ -86,11 +86,11 @@ func gotEvent(ctx context.Context, event cloudevents.Event) error {
 func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 
 	stdLogger := keptnutils.NewLogger(shkeptncontext, event.Context.GetID(), "mongodb-service")
-	stdLogger.Debug("my first log message")
+	stdLogger.Debug("Database synchronization started")
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    cartsDB,
-		targetDB:    "carts-db-test-4",
+		targetDB:    "carts-db-test",
 		host:        defaultHost,
 		port:        defaultPort,
 		dumpDir:     dumpDirAllCollections,
@@ -100,10 +100,10 @@ func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 		},
 	}
 	if err := executeMongoDump(dbInfo); err != nil {
-		//TODO
+		stdLogger.Error(fmt.Sprintf("Failed to execute mongo dump on database  %s: %s", dbInfo.sourceDB, err.Error()))
 	}
 	if err := executeMongoRestore(dbInfo); err != nil {
-		//TODO
+		stdLogger.Error(fmt.Sprintf("Failed to execute mongo restore on database  %s: %s", dbInfo.targetDB, err.Error()))
 	}
 }
 
