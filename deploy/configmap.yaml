@@ -1,0 +1,17 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-service-config
+  namespace: keptn
+data:
+  # general configuration for mongodb-service
+  DUMP_DIR_ONE_COLLECTION: "/data/dumpdir/dumpDirOneCollection"
+  DUMP_DIR_MULTIPLE_COLLECTIONS: "/data/dumpdir/dumpDirMultipleCollections"
+  DUMP_DIR_ALL_COLLECTIONS: "/data/dumpdir/dumpDirAllCollections"
+  # configuration for carts service
+  CARTS_SOURCEDB: "carts-db"
+  CARTS_TARGETDB: "carts-db-test"
+  CARTS_DEFAULT_PORT: "27017"
+  CARTS_DEFAULT_HOST: ""
+  CARTS_COLLECTIONS: "" 

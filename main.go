@@ -37,12 +37,9 @@ type envConfig struct {
 }
 
 var (
-	cartsDB       = "carts-db"
-	defaultHost   = "localhost"
-	defaultPort   = "27017"
-	itemsCol      = "items"
-	categoriesCol = "categories"
-	timeout       = 10 * time.Second
+	defaultHost = "localhost"
+	defaultPort = "27017"
+	timeout     = 10 * time.Second
 
 	// environment variables defined in ./deploy/service.yaml
 	dumpDirOneCollection       = os.Getenv("DUMP_DIR_ONE_COLLECTION")
@@ -88,11 +85,26 @@ func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 	stdLogger := keptnutils.NewLogger(shkeptncontext, event.Context.GetID(), "mongodb-service")
 	stdLogger.Debug("Database synchronization started")
 
+	e := &keptnevents.ConfigurationChangeEventData{}
+	if err := event.DataAs(e); err != nil {
+		stdLogger.Error(fmt.Sprintf("Got Data Error: %s", err.Error()))
+	}
+
+	service := strings.ToUpper(e.Service) // in our demo example, this will be carts --> toUpper: CARTS
+
+	/*
+		if os.Getenv(service + "_SOURCEDB") == "" {
+			fmt.Println("No source db configured for "+service)
+		}
+
+		...
+	*/
+
 	dbInfo := &DatabaseInfo{
-		sourceDB:    cartsDB,
-		targetDB:    "carts-db-test",
-		host:        defaultHost,
-		port:        defaultPort,
+		sourceDB:    os.Getenv(service + "_SOURCEDB"), // TODO: before assigning those env variables, it should be checked whether they are available.
+		targetDB:    os.Getenv(service + "_TARGETDB"),
+		host:        os.Getenv(service + "_DEFAULT_HOST"),
+		port:        os.Getenv(service + "_DEFAULT_PORT"),
 		dumpDir:     dumpDirAllCollections,
 		collections: []string{},
 		args: []string{
