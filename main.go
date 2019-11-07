@@ -9,8 +9,8 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -91,22 +91,35 @@ func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 	}
 
 	service := strings.ToUpper(e.Service) // in our demo example, this will be carts --> toUpper: CARTS
+	sourceDB := os.Getenv(service + "_SOURCEDB")
+	targetDB := os.Getenv(service + "_TARGETDB")
+	host := os.Getenv(service + "_DEFAULT_HOST")
+	port := os.Getenv(service + "_DEFAULT_PORT")
 
-	/*
-		if os.Getenv(service + "_SOURCEDB") == "" {
-			fmt.Println("No source db configured for "+service)
-		}
-
-		...
-	*/
+	if sourceDB == "" {
+		stdLogger.Error(fmt.Sprintf("No source database configured for %s", service))
+		return
+	}
+	if targetDB == "" {
+		stdLogger.Error(fmt.Sprintf("No target database configured for %s", service))
+		return
+	}
+	if host == "" {
+		stdLogger.Error(fmt.Sprintf("No host configured for %s", service))
+		return
+	}
+	if isValidPort(port) {
+		stdLogger.Error(fmt.Sprintf("Invalid port \"%s\" configured for %s", port, service))
+		return
+	}
 
 	dbInfo := &DatabaseInfo{
-		sourceDB:    os.Getenv(service + "_SOURCEDB"), // TODO: before assigning those env variables, it should be checked whether they are available.
-		targetDB:    os.Getenv(service + "_TARGETDB"),
-		host:        os.Getenv(service + "_DEFAULT_HOST"),
-		port:        os.Getenv(service + "_DEFAULT_PORT"),
-		dumpDir:     dumpDirAllCollections,
-		collections: []string{},
+		sourceDB:    sourceDB,
+		targetDB:    targetDB,
+		host:        host,
+		port:        port,
+		dumpDir:     os.Getenv("DUMP_DIR"),
+		collections: getCollections(os.Getenv(service + "_COLLECTIONS")),
 		args: []string{
 			mr.DropOption,
 		},
@@ -150,9 +163,17 @@ func getDatabase(ctx context.Context, dbInfo *DatabaseInfo) (*mongo.Database, er
 	return client.Database(dbInfo.sourceDB), nil
 }
 
-func fail(err error, t *testing.T) {
-	fmt.Println(err)
-	t.Fail()
+// getCollections converts a string with collection names to a string array.
+func getCollections(collections string) []string {
+	if collections == "" {
+		return []string{}
+	}
+	parts := strings.Split(collections, ";")
+	colArr := make([]string, len(parts))
+	for i, part := range parts {
+		colArr[i] = part
+	}
+	return colArr
 }
 
 // getMongoDump returns an initialized MongoDump object.
@@ -352,4 +373,13 @@ func contains(arr []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// isValidPort checks if a given port is valid
+func isValidPort(port string) bool {
+	n, err := strconv.Atoi(port)
+	if err != nil {
+		return false
+	}
+	return n > 0 && n < 65536
 }
