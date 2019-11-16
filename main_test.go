@@ -46,7 +46,8 @@ func TestMain(m *testing.M) {
 // TestMongoDriver instantiates the mongo driver.
 func TestMongoDriver(t *testing.T) {
 	fmt.Println("\n>> TestMongoDriver()")
-
+	StartTimer()
+	
 	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	dbInfo := &DatabaseInfo{
 		sourceDB: os.Getenv("CARTS_SOURCEDB"),
@@ -62,12 +63,14 @@ func TestMongoDriver(t *testing.T) {
 	if singleResult.Err() != nil {
 		fail(singleResult.Err(), t)
 	}
+	fmt.Printf("Duration: %s", GetDuration())
 }
 
 // TestMongoDumpAllCollections executes mongo dump for all
 // the collections in the database.
 func TestMongoDumpAllCollections(t *testing.T) {
 	fmt.Println("\n>> TestMongoDumpAllCollections()")
+	StartTimer()
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    os.Getenv("CARTS_SOURCEDB"),
@@ -79,12 +82,14 @@ func TestMongoDumpAllCollections(t *testing.T) {
 	if err := executeMongoDump(dbInfo); err != nil {
 		fail(err, t)
 	}
+	fmt.Printf("Duration: %s", GetDuration())
 }
 
 // TestMongoDumpOneCollection executes mongo dump for the
 // categories collection.
 func TestMongoDumpOneCollection(t *testing.T) {
 	fmt.Println("\n>> TestMongoDumpOneCollection()")
+	StartTimer()
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    os.Getenv("CARTS_SOURCEDB"),
@@ -96,12 +101,14 @@ func TestMongoDumpOneCollection(t *testing.T) {
 	if err := executeMongoDump(dbInfo); err != nil {
 		fail(err, t)
 	}
+	fmt.Printf("Duration: %s", GetDuration())
 }
 
 // TestMongoDumpMultipleCollections executes mongo dump for the
 // multiple collections.
 func TestMongoDumpMultipleCollections(t *testing.T) {
 	fmt.Println("\n>> TestMongoDumpMultipleCollections()")
+	StartTimer()
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    os.Getenv("CARTS_SOURCEDB"),
@@ -113,12 +120,14 @@ func TestMongoDumpMultipleCollections(t *testing.T) {
 	if err := executeMongoDump(dbInfo); err != nil {
 		fail(err, t)
 	}
+	fmt.Printf("Duration: %s", GetDuration())
 }
 
 // TestMongoRestoreAllCollections executes mongo restore for all
 // the collections in the database.
 func TestMongoRestoreAllCollections(t *testing.T) {
 	fmt.Println("\n>> TestMongoRestoreAllCollections()")
+	StartTimer()
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    os.Getenv("CARTS_SOURCEDB"),
@@ -134,12 +143,14 @@ func TestMongoRestoreAllCollections(t *testing.T) {
 	if err := executeMongoRestore(dbInfo); err != nil {
 		fail(err, t)
 	}
+	fmt.Printf("Duration: %s", GetDuration())
 }
 
 // TestMongoRestoreOneCollection executes mongo restore for
 // the categories collection.
 func TestMongoRestoreOneCollection(t *testing.T) {
 	fmt.Println("\n>> TestMongoRestoreOneCollection()")
+	StartTimer()
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    os.Getenv("CARTS_SOURCEDB"),
@@ -155,12 +166,14 @@ func TestMongoRestoreOneCollection(t *testing.T) {
 	if err := executeMongoRestore(dbInfo); err != nil {
 		fail(err, t)
 	}
+	fmt.Printf("Duration: %s", GetDuration())
 }
 
 // TestMongoRestoreMultipleCollection executes mongo restore for
 // the categories collection.
 func TestMongoRestoreMultipleCollections(t *testing.T) {
 	fmt.Println("\n>> TestMongoRestoreMultipleCollections()")
+	StartTimer()
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    os.Getenv("CARTS_SOURCEDB"),
@@ -174,12 +187,14 @@ func TestMongoRestoreMultipleCollections(t *testing.T) {
 	if err := executeMongoRestore(dbInfo); err != nil {
 		fail(err, t)
 	}
+	fmt.Printf("Duration: %s", GetDuration())
 }
 
 // TestDatabaseSync executes a synchronization of two databases
 //(dump and restore operation).
 func TestDatabaseSync(t *testing.T) {
 	fmt.Println("\n>> TestDatabaseSync()")
+	StartTimer()
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    os.Getenv("CARTS_SOURCEDB"),
@@ -198,4 +213,5 @@ func TestDatabaseSync(t *testing.T) {
 	if err := executeMongoRestore(dbInfo); err != nil {
 		fail(err, t)
 	}
+	fmt.Printf("Duration: %s", GetDuration())
 }

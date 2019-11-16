@@ -40,6 +40,7 @@ var (
 	defaultHost = "localhost"
 	defaultPort = "27017"
 	timeout     = 10 * time.Second
+	timer       = time.Now()
 
 	// environment variables defined in ./deploy/service.yaml
 	dumpDirOneCollection       = os.Getenv("DUMP_DIR_ONE_COLLECTION")
@@ -124,12 +125,14 @@ func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 			mr.DropOption,
 		},
 	}
+	StartTimer()
 	if err := executeMongoDump(dbInfo); err != nil {
 		stdLogger.Error(fmt.Sprintf("Failed to execute mongo dump on database  %s: %s", dbInfo.sourceDB, err.Error()))
 	}
 	if err := executeMongoRestore(dbInfo); err != nil {
 		stdLogger.Error(fmt.Sprintf("Failed to execute mongo restore on database  %s: %s", dbInfo.targetDB, err.Error()))
 	}
+	fmt.Printf("Duration of snapshot synchronization: %s", GetDuration())
 }
 
 func _main(args []string, env envConfig) int {
@@ -382,4 +385,14 @@ func isValidPort(port string) bool {
 		return false
 	}
 	return n > 0 && n < 65536
+}
+
+// StartTimer sets the current time for time measurement
+func StartTimer() {
+	timer = time.Now()
+}
+
+// GetDuration returns the time passed since the timer started
+func GetDuration() time.Duration {
+	return time.Since(timer)
 }
