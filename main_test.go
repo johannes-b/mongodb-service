@@ -16,16 +16,22 @@ import (
 // variables needed for running the tests
 func setEnvironmentVariables() {
 	//configuration for carts service
-	os.Setenv("CARTS_SOURCEDB", "carts-db")
+	os.Setenv("CARTS_SOURCEDB", "carts-db") //84.0KB
 	os.Setenv("CARTS_TARGETDB", "carts-db-test")
 	os.Setenv("CARTS_PORT", "27017")
 	os.Setenv("CARTS_HOST", "")
 	os.Setenv("CARTS_COLLECTIONS", "")
 
+	os.Setenv("TRADES_SOURCEDB", "trades-db") //1.2MB
+	os.Setenv("TRADES_TARGETDB", "trades-db-test")
+	os.Setenv("TRADES_PORT", "27017")
+	os.Setenv("TRADES_HOST", "")
+
 	//additional env variables for test cases
 	os.Setenv("DUMP_DIR_ONE_COLLECTION", "./dumpdir/dumpDirOneCollection")
 	os.Setenv("DUMP_DIR_MULTIPLE_COLLECTIONS", "./dumpdir/dumpDirMultipleCollections")
 	os.Setenv("DUMP_DIR_ALL_COLLECTIONS", "./dumpdir/dumpDirAllCollections")
+	os.Setenv("DUMP_DIR_TRADES_DB", "./dumpdir/dumpDirTradesDb")
 	os.Setenv("CARTS_COLLECTIONS_2", "items")
 	os.Setenv("CARTS_COLLECTIONS_3", "items;categories")
 }
@@ -206,6 +212,30 @@ func TestDatabaseSync(t *testing.T) {
 		port:        os.Getenv("CARTS_PORT"),
 		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
 		collections: getCollections(os.Getenv("CARTS_COLLECTIONS")),
+		args: []string{
+			mr.DropOption,
+		},
+	}
+	if err := executeMongoDump(dbInfo); err != nil {
+		fail(err, t)
+	}
+	if err := executeMongoRestore(dbInfo); err != nil {
+		fail(err, t)
+	}
+	fmt.Printf("Duration: %s", GetDuration())
+}
+
+func TestLargeDatabase(t *testing.T) {
+	fmt.Println("\n>> TestLargeDatabase()")
+	StartTimer()
+
+	dbInfo := &DatabaseInfo{
+		sourceDB:    os.Getenv("TRADES_SOURCEDB"),
+		targetDB:    os.Getenv("TRADES_TARGETDB"),
+		host:        os.Getenv("TRADES_HOST"),
+		port:        os.Getenv("TRADES_PORT"),
+		dumpDir:     os.Getenv("DUMP_DIR_TRADES_DB"),
+		collections: getCollections(""),
 		args: []string{
 			mr.DropOption,
 		},
