@@ -47,8 +47,8 @@ func TestMain(m *testing.M) {
 func TestMongoDriver(t *testing.T) {
 	fmt.Println("\n>> TestMongoDriver()")
 	StartTimer()
-	
-	ctx, _ := context.WithTimeout(context.Background(), timeout)
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	dbInfo := &DatabaseInfo{
 		sourceDB: os.Getenv("CARTS_SOURCEDB"),
 		host:     os.Getenv("CARTS_HOST"),
@@ -56,13 +56,16 @@ func TestMongoDriver(t *testing.T) {
 	}
 	db, err := getDatabase(ctx, dbInfo)
 	if err != nil {
+		cancel()
 		fail(err, t)
 	}
 	singleResult := db.RunCommand(ctx, bson.M{"listCommands": 1})
 
 	if singleResult.Err() != nil {
+		cancel()
 		fail(singleResult.Err(), t)
 	}
+	cancel()
 	fmt.Printf("Duration: %s", GetDuration())
 }
 

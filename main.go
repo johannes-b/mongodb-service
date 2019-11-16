@@ -353,13 +353,15 @@ func assertDatabaseConsistency(dbInfo *DatabaseInfo) error {
 
 //getCollectionNames returns the collection names from a database.
 func getCollectionNames(dbInfo *DatabaseInfo) ([]string, error) {
-	ctx, _ := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	db, err := getDatabase(ctx, dbInfo)
-
 	if err != nil {
+		cancel()
 		return nil, err
 	}
-	return db.ListCollectionNames(ctx, bson.M{})
+	collections, err := db.ListCollectionNames(ctx, bson.M{})
+	cancel()
+	return collections, err
 }
 
 // getFiles returns the files from a dump directory.
