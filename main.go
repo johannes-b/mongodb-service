@@ -48,6 +48,12 @@ var (
 	dumpDirAllCollections      = os.Getenv("DUMP_DIR_ALL_COLLECTIONS")
 )
 
+const (
+	errorNotAllCollsDumped  = "not all collections were dumped/restored"
+	errorDumpedFiles        = "unable to get dumped files"
+	errorCollectionNotFound = "could not find collection %s in dump directory"
+)
+
 // DatabaseInfo groups information from a database.
 type DatabaseInfo struct {
 	sourceDB    string
@@ -306,8 +312,8 @@ func assertDatabaseConsistency(dbInfo *DatabaseInfo) error {
 
 	files, err := getDumpedFiles(dbInfo)
 	if err != nil {
-		fmt.Println("An error occured while checking the files in the dump directory!")
-		return err
+		fmt.Println(err)
+		return fmt.Errorf(errorDumpedFiles)
 	}
 	collectionNamesDump := make([]string, len(files)/2)
 
@@ -339,12 +345,12 @@ func assertDatabaseConsistency(dbInfo *DatabaseInfo) error {
 
 	if len(dbInfo.collections) == 0 {
 		if !reflect.DeepEqual(collectionNamesDump, collectionNamesDB) {
-			return fmt.Errorf("not all collections were dumped/restored")
+			return fmt.Errorf(errorNotAllCollsDumped)
 		}
 	} else {
 		for _, col := range dbInfo.collections {
 			if !contains(collectionNamesDump, col) {
-				return fmt.Errorf("could not find collection " + col + "in dump directory")
+				return fmt.Errorf(errorCollectionNotFound, col)
 			}
 		}
 	}

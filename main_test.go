@@ -13,7 +13,7 @@ import (
 )
 
 // setEnvironmentVariables is a helper method to set various environment
-// variables needed for running the tests
+// variables needed for running the tests.
 func setEnvironmentVariables() {
 	//configuration for carts service
 	os.Setenv("CARTS_SOURCEDB", "carts-db") //84.0KB
@@ -36,17 +36,21 @@ func setEnvironmentVariables() {
 	os.Setenv("CARTS_COLLECTIONS_3", "items;categories")
 }
 
-// fail is a helper method to mark the calling test as failed
-// and prints the error message
-func fail(err error, t *testing.T) {
-	fmt.Println(err)
-	t.Fail()
+// assertError compares the actual error message with the expected.
+func assertError(t *testing.T, expectedMsg string, actualError error) {
+	if actualError == nil {
+		t.Error("expected an error, but no error was thrown.")
+		return
+	}
+	if actualError.Error() != expectedMsg {
+		t.Errorf("unexpected error message, expected: %s, found: %s", expectedMsg, actualError)
+	}
 }
 
 func TestMain(m *testing.M) {
-	fmt.Println("test main")
 	setEnvironmentVariables()
-	os.Exit(m.Run())
+	m.Run()
+	os.RemoveAll("./dumpdir/")
 }
 
 // TestMongoDriver instantiates the mongo driver.
@@ -63,13 +67,13 @@ func TestMongoDriver(t *testing.T) {
 	db, err := getDatabase(ctx, dbInfo)
 	if err != nil {
 		cancel()
-		fail(err, t)
+		t.Errorf("Error message: %s", err)
 	}
 	singleResult := db.RunCommand(ctx, bson.M{"listCommands": 1})
 
 	if singleResult.Err() != nil {
 		cancel()
-		fail(singleResult.Err(), t)
+		t.Errorf("Error message: %s", singleResult.Err())
 	}
 	cancel()
 	fmt.Printf("Duration: %s", GetDuration())
@@ -89,7 +93,7 @@ func TestMongoDumpAllCollections(t *testing.T) {
 		collections: getCollections(os.Getenv("CARTS_COLLECTIONS")),
 	}
 	if err := executeMongoDump(dbInfo); err != nil {
-		fail(err, t)
+		t.Errorf("Error message: %s", err)
 	}
 	fmt.Printf("Duration: %s", GetDuration())
 }
@@ -108,7 +112,7 @@ func TestMongoDumpOneCollection(t *testing.T) {
 		collections: getCollections(os.Getenv("CARTS_COLLECTIONS_2")),
 	}
 	if err := executeMongoDump(dbInfo); err != nil {
-		fail(err, t)
+		t.Errorf("Error message: %s", err)
 	}
 	fmt.Printf("Duration: %s", GetDuration())
 }
@@ -127,7 +131,7 @@ func TestMongoDumpMultipleCollections(t *testing.T) {
 		collections: getCollections(os.Getenv("CARTS_COLLECTIONS_3")),
 	}
 	if err := executeMongoDump(dbInfo); err != nil {
-		fail(err, t)
+		t.Errorf("Error message: %s", err)
 	}
 	fmt.Printf("Duration: %s", GetDuration())
 }
@@ -150,7 +154,7 @@ func TestMongoRestoreAllCollections(t *testing.T) {
 		},
 	}
 	if err := executeMongoRestore(dbInfo); err != nil {
-		fail(err, t)
+		t.Errorf("Error message: %s", err)
 	}
 	fmt.Printf("Duration: %s", GetDuration())
 }
@@ -163,7 +167,7 @@ func TestMongoRestoreOneCollection(t *testing.T) {
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    os.Getenv("CARTS_SOURCEDB"),
-		targetDB:    "carts-db-test-2",
+		targetDB:    os.Getenv("CARTS_TARGETDB"),
 		host:        os.Getenv("CARTS_HOST"),
 		port:        os.Getenv("CARTS_PORT"),
 		dumpDir:     os.Getenv("DUMP_DIR_ONE_COLLECTION"),
@@ -173,7 +177,7 @@ func TestMongoRestoreOneCollection(t *testing.T) {
 		},
 	}
 	if err := executeMongoRestore(dbInfo); err != nil {
-		fail(err, t)
+		t.Errorf("Error message: %s", err)
 	}
 	fmt.Printf("Duration: %s", GetDuration())
 }
@@ -186,7 +190,7 @@ func TestMongoRestoreMultipleCollections(t *testing.T) {
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    os.Getenv("CARTS_SOURCEDB"),
-		targetDB:    "carts-db-test-3",
+		targetDB:    os.Getenv("CARTS_TARGETDB"),
 		host:        os.Getenv("CARTS_HOST"),
 		port:        os.Getenv("CARTS_PORT"),
 		dumpDir:     os.Getenv("DUMP_DIR_MULTIPLE_COLLECTIONS"),
@@ -194,7 +198,7 @@ func TestMongoRestoreMultipleCollections(t *testing.T) {
 		args:        []string{},
 	}
 	if err := executeMongoRestore(dbInfo); err != nil {
-		fail(err, t)
+		t.Errorf("Error message: %s", err)
 	}
 	fmt.Printf("Duration: %s", GetDuration())
 }
@@ -207,7 +211,7 @@ func TestDatabaseSync(t *testing.T) {
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    os.Getenv("CARTS_SOURCEDB"),
-		targetDB:    "carts-db-test-4",
+		targetDB:    os.Getenv("CARTS_TARGETDB"),
 		host:        os.Getenv("CARTS_HOST"),
 		port:        os.Getenv("CARTS_PORT"),
 		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
@@ -217,14 +221,15 @@ func TestDatabaseSync(t *testing.T) {
 		},
 	}
 	if err := executeMongoDump(dbInfo); err != nil {
-		fail(err, t)
+		t.Errorf("Error message: %s", err)
 	}
 	if err := executeMongoRestore(dbInfo); err != nil {
-		fail(err, t)
+		t.Errorf("Error message: %s", err)
 	}
 	fmt.Printf("Duration: %s", GetDuration())
 }
 
+// TestLargeDatabase executes a synchronization of two large databases.
 func TestLargeDatabase(t *testing.T) {
 	fmt.Println("\n>> TestLargeDatabase()")
 	StartTimer()
@@ -241,10 +246,75 @@ func TestLargeDatabase(t *testing.T) {
 		},
 	}
 	if err := executeMongoDump(dbInfo); err != nil {
-		fail(err, t)
+		t.Errorf("Error message: %s", err)
 	}
 	if err := executeMongoRestore(dbInfo); err != nil {
-		fail(err, t)
+		t.Errorf("Error message: %s", err)
 	}
 	fmt.Printf("Duration: %s", GetDuration())
+}
+
+// TestNotExistingSourceDB executes mongo dump on a not existing database
+// and checks the expected error.
+func TestNotExistingSourceDB(t *testing.T) {
+	fmt.Println("\n>> TestNotExistingSourceDB()")
+
+	dbInfo := &DatabaseInfo{
+		sourceDB:    "db1",
+		host:        os.Getenv("CARTS_HOST"),
+		port:        os.Getenv("CARTS_PORT"),
+		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
+		collections: getCollections(os.Getenv("CARTS_COLLECTIONS")),
+	}
+	err := executeMongoDump(dbInfo)
+	assertError(t, errorDumpedFiles, err)
+}
+
+// TestNotAllCollectionsDumped1 executes a mongo dump of all collections,
+// deletes a dumped file and checks the expected error.
+func TestNotAllCollectionsDumped1(t *testing.T) {
+	fmt.Println("\n>> TestNotAllCollectionsDumped1()")
+
+	dbInfo := &DatabaseInfo{
+		sourceDB:    os.Getenv("CARTS_SOURCEDB"),
+		targetDB:    os.Getenv("CARTS_TARGETDB"),
+		host:        os.Getenv("CARTS_HOST"),
+		port:        os.Getenv("CARTS_PORT"),
+		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
+		collections: getCollections(os.Getenv("CARTS_COLLECTIONS")),
+		args: []string{
+			mr.DropOption,
+		},
+	}
+	if err := executeMongoDump(dbInfo); err != nil {
+		t.Errorf("error message: %s", err)
+	}
+	os.Remove(dbInfo.dumpDir + "\\" + dbInfo.sourceDB + "\\items.metadata.json")
+	err := executeMongoRestore(dbInfo)
+	assertError(t, errorNotAllCollsDumped, err)
+}
+
+// TestNotAllCollectionsDumped2 executes a mongo dump of a specific collection,
+// deletes a dumped file and checks the expected error.
+func TestNotAllCollectionsDumped2(t *testing.T) {
+	fmt.Println("\n>> TestNotAllCollectionsDumped2()")
+
+	dbInfo := &DatabaseInfo{
+		sourceDB:    os.Getenv("CARTS_SOURCEDB"),
+		targetDB:    os.Getenv("CARTS_TARGETDB"),
+		host:        os.Getenv("CARTS_HOST"),
+		port:        os.Getenv("CARTS_PORT"),
+		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
+		collections: getCollections(os.Getenv("CARTS_COLLECTIONS_2")),
+		args: []string{
+			mr.DropOption,
+		},
+	}
+	if err := executeMongoDump(dbInfo); err != nil {
+		t.Errorf("error message: %s", err)
+	}
+	os.Remove(dbInfo.dumpDir + "\\" + dbInfo.sourceDB + "\\items.metadata.json")
+	err := executeMongoRestore(dbInfo)
+	expected := fmt.Sprintf(errorCollectionNotFound, os.Getenv("CARTS_COLLECTIONS_2"))
+	assertError(t, expected, err)
 }
