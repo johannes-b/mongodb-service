@@ -204,7 +204,7 @@ func TestMongoRestoreMultipleCollections(t *testing.T) {
 }
 
 // TestDatabaseSync executes a synchronization of two databases
-//(dump and restore operation).
+// (dump and restore operation).
 func TestDatabaseSync(t *testing.T) {
 	fmt.Println("\n>> TestDatabaseSync()")
 	StartTimer()

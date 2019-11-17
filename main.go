@@ -138,7 +138,7 @@ func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 	if err := executeMongoRestore(dbInfo); err != nil {
 		stdLogger.Error(fmt.Sprintf("Failed to execute mongo restore on database  %s: %s", dbInfo.targetDB, err.Error()))
 	}
-	fmt.Printf("Duration of snapshot synchronization: %s", GetDuration())
+	stdLogger.Debug(fmt.Sprintf("Duration of snapshot synchronization: %s", GetDuration()))
 }
 
 func _main(args []string, env envConfig) int {
@@ -218,7 +218,6 @@ func getMongoDump(dbInfo *DatabaseInfo) *md.MongoDump {
 // executeMongoDump processes a mongodump operation.
 func executeMongoDump(dbInfo *DatabaseInfo) error {
 	if len(dbInfo.collections) == 0 { //dump all collections
-		fmt.Println("Dumping all collections from " + dbInfo.sourceDB)
 		if err := initAndDump(dbInfo, ""); err != nil {
 			return err
 		}
@@ -300,8 +299,6 @@ func initAndRestore(dbname string, targetDir string, args []string) error {
 	return nil
 }
 
-//------------  --------------
-
 // assertDatabaseConsistency checks if all collections in the directory are
 // available also in the database.
 func assertDatabaseConsistency(dbInfo *DatabaseInfo) error {
@@ -312,7 +309,6 @@ func assertDatabaseConsistency(dbInfo *DatabaseInfo) error {
 
 	files, err := getDumpedFiles(dbInfo)
 	if err != nil {
-		fmt.Println(err)
 		return fmt.Errorf(errorDumpedFiles)
 	}
 	collectionNamesDump := make([]string, len(files)/2)
