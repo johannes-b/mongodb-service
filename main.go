@@ -9,8 +9,8 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -40,11 +40,18 @@ var (
 	defaultHost = "localhost"
 	defaultPort = "27017"
 	timeout     = 10 * time.Second
+	timer       = time.Now()
 
 	// environment variables defined in ./deploy/service.yaml
 	dumpDirOneCollection       = os.Getenv("DUMP_DIR_ONE_COLLECTION")
 	dumpDirMultipleCollections = os.Getenv("DUMP_DIR_MULTIPLE_COLLECTIONS")
 	dumpDirAllCollections      = os.Getenv("DUMP_DIR_ALL_COLLECTIONS")
+)
+
+const (
+	errorNotAllCollsDumped  = "not all collections were dumped/restored"
+	errorDumpedFiles        = "unable to get dumped files"
+	errorCollectionNotFound = "could not find collection %s in dump directory"
 )
 
 // DatabaseInfo groups information from a database.
@@ -91,32 +98,47 @@ func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 	}
 
 	service := strings.ToUpper(e.Service) // in our demo example, this will be carts --> toUpper: CARTS
+	sourceDB := os.Getenv(service + "_SOURCEDB")
+	targetDB := os.Getenv(service + "_TARGETDB")
+	host := os.Getenv(service + "_DEFAULT_HOST")
+	port := os.Getenv(service + "_DEFAULT_PORT")
 
-	/*
-		if os.Getenv(service + "_SOURCEDB") == "" {
-			fmt.Println("No source db configured for "+service)
-		}
-
-		...
-	*/
+	if sourceDB == "" {
+		stdLogger.Error(fmt.Sprintf("No source database configured for %s", service))
+		return
+	}
+	if targetDB == "" {
+		stdLogger.Error(fmt.Sprintf("No target database configured for %s", service))
+		return
+	}
+	if host == "" {
+		stdLogger.Error(fmt.Sprintf("No host configured for %s", service))
+		return
+	}
+	if isValidPort(port) {
+		stdLogger.Error(fmt.Sprintf("Invalid port \"%s\" configured for %s", port, service))
+		return
+	}
 
 	dbInfo := &DatabaseInfo{
-		sourceDB:    os.Getenv(service + "_SOURCEDB"), // TODO: before assigning those env variables, it should be checked whether they are available.
-		targetDB:    os.Getenv(service + "_TARGETDB"),
-		host:        os.Getenv(service + "_DEFAULT_HOST"),
-		port:        os.Getenv(service + "_DEFAULT_PORT"),
-		dumpDir:     dumpDirAllCollections,
-		collections: []string{},
+		sourceDB:    sourceDB,
+		targetDB:    targetDB,
+		host:        host,
+		port:        port,
+		dumpDir:     os.Getenv("DUMP_DIR"),
+		collections: getCollections(os.Getenv(service + "_COLLECTIONS")),
 		args: []string{
 			mr.DropOption,
 		},
 	}
+	StartTimer()
 	if err := executeMongoDump(dbInfo); err != nil {
 		stdLogger.Error(fmt.Sprintf("Failed to execute mongo dump on database  %s: %s", dbInfo.sourceDB, err.Error()))
 	}
 	if err := executeMongoRestore(dbInfo); err != nil {
 		stdLogger.Error(fmt.Sprintf("Failed to execute mongo restore on database  %s: %s", dbInfo.targetDB, err.Error()))
 	}
+	stdLogger.Debug(fmt.Sprintf("Duration of snapshot synchronization: %s", GetDuration()))
 }
 
 func _main(args []string, env envConfig) int {
@@ -150,9 +172,17 @@ func getDatabase(ctx context.Context, dbInfo *DatabaseInfo) (*mongo.Database, er
 	return client.Database(dbInfo.sourceDB), nil
 }
 
-func fail(err error, t *testing.T) {
-	fmt.Println(err)
-	t.Fail()
+// getCollections converts a string with collection names to a string array.
+func getCollections(collections string) []string {
+	if collections == "" {
+		return []string{}
+	}
+	parts := strings.Split(collections, ";")
+	colArr := make([]string, len(parts))
+	for i, part := range parts {
+		colArr[i] = part
+	}
+	return colArr
 }
 
 // getMongoDump returns an initialized MongoDump object.
@@ -188,7 +218,6 @@ func getMongoDump(dbInfo *DatabaseInfo) *md.MongoDump {
 // executeMongoDump processes a mongodump operation.
 func executeMongoDump(dbInfo *DatabaseInfo) error {
 	if len(dbInfo.collections) == 0 { //dump all collections
-		fmt.Println("Dumping all collections from " + dbInfo.sourceDB)
 		if err := initAndDump(dbInfo, ""); err != nil {
 			return err
 		}
@@ -270,8 +299,6 @@ func initAndRestore(dbname string, targetDir string, args []string) error {
 	return nil
 }
 
-//------------  --------------
-
 // assertDatabaseConsistency checks if all collections in the directory are
 // available also in the database.
 func assertDatabaseConsistency(dbInfo *DatabaseInfo) error {
@@ -282,8 +309,7 @@ func assertDatabaseConsistency(dbInfo *DatabaseInfo) error {
 
 	files, err := getDumpedFiles(dbInfo)
 	if err != nil {
-		fmt.Println("An error occured while checking the files in the dump directory!")
-		return err
+		return fmt.Errorf(errorDumpedFiles)
 	}
 	collectionNamesDump := make([]string, len(files)/2)
 
@@ -315,12 +341,12 @@ func assertDatabaseConsistency(dbInfo *DatabaseInfo) error {
 
 	if len(dbInfo.collections) == 0 {
 		if !reflect.DeepEqual(collectionNamesDump, collectionNamesDB) {
-			return fmt.Errorf("not all collections were dumped/restored")
+			return fmt.Errorf(errorNotAllCollsDumped)
 		}
 	} else {
 		for _, col := range dbInfo.collections {
 			if !contains(collectionNamesDump, col) {
-				return fmt.Errorf("could not find collection " + col + "in dump directory")
+				return fmt.Errorf(errorCollectionNotFound, col)
 			}
 		}
 	}
@@ -329,13 +355,15 @@ func assertDatabaseConsistency(dbInfo *DatabaseInfo) error {
 
 //getCollectionNames returns the collection names from a database.
 func getCollectionNames(dbInfo *DatabaseInfo) ([]string, error) {
-	ctx, _ := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	db, err := getDatabase(ctx, dbInfo)
-
 	if err != nil {
+		cancel()
 		return nil, err
 	}
-	return db.ListCollectionNames(ctx, bson.M{})
+	collections, err := db.ListCollectionNames(ctx, bson.M{})
+	cancel()
+	return collections, err
 }
 
 // getFiles returns the files from a dump directory.
@@ -352,4 +380,23 @@ func contains(arr []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// isValidPort checks if a given port is valid
+func isValidPort(port string) bool {
+	n, err := strconv.Atoi(port)
+	if err != nil {
+		return false
+	}
+	return n > 0 && n < 65536
+}
+
+// StartTimer sets the current time for time measurement
+func StartTimer() {
+	timer = time.Now()
+}
+
+// GetDuration returns the time passed since the timer started
+func GetDuration() time.Duration {
+	return time.Since(timer)
 }
