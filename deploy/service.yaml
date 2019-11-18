@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: mongodb-service
-        image: jbraeuer/mongodb-service:latest
+        image: jbraeuer/mongodb-service:0.0.10
         ports:
         - containerPort: 8080
         resources:
@@ -28,6 +28,9 @@ spec:
         volumeMounts:
         - mountPath: /data/dumpdir
           name: mongodb-dump-volume
+        env:
+        - name: CONFIGURATION_SERVICE
+          value: 'http://configuration-service.keptn.svc.cluster.local:8080'
         envFrom:
         - configMapRef:
             name: mongodb-service-config
