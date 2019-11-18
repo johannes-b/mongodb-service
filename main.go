@@ -98,23 +98,23 @@ func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 	}
 
 	service := strings.ToUpper(e.Service) // in our demo example, this will be carts --> toUpper: CARTS
-	sourceDB := os.Getenv(service + "_SOURCEDB")
-	targetDB := os.Getenv(service + "_TARGETDB")
-	host := os.Getenv(service + "_DEFAULT_HOST")
-	port := os.Getenv(service + "_DEFAULT_PORT")
 
+	sourceDB := os.Getenv(service + "_SOURCEDB")
 	if sourceDB == "" {
 		stdLogger.Error(fmt.Sprintf("No source database configured for %s", service))
 		return
 	}
+	targetDB := os.Getenv(service + "_TARGETDB")
 	if targetDB == "" {
 		stdLogger.Error(fmt.Sprintf("No target database configured for %s", service))
 		return
 	}
+	host := os.Getenv(service + "_DEFAULT_HOST")
 	if host == "" {
 		stdLogger.Error(fmt.Sprintf("No host configured for %s", service))
 		return
 	}
+	port := os.Getenv(service + "_DEFAULT_PORT")
 	if isValidPort(port) {
 		stdLogger.Error(fmt.Sprintf("Invalid port \"%s\" configured for %s", port, service))
 		return
@@ -131,10 +131,13 @@ func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 			mr.DropOption,
 		},
 	}
+
 	StartTimer()
+
 	if err := executeMongoDump(dbInfo); err != nil {
 		stdLogger.Error(fmt.Sprintf("Failed to execute mongo dump on database  %s: %s", dbInfo.sourceDB, err.Error()))
 	}
+
 	if err := executeMongoRestore(dbInfo); err != nil {
 		stdLogger.Error(fmt.Sprintf("Failed to execute mongo restore on database  %s: %s", dbInfo.targetDB, err.Error()))
 	}
