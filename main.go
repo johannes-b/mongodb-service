@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
 	"reflect"
 	"sort"
@@ -18,6 +19,7 @@ import (
 	"github.com/cloudevents/sdk-go/pkg/cloudevents"
 	"github.com/cloudevents/sdk-go/pkg/cloudevents/client"
 	cloudeventshttp "github.com/cloudevents/sdk-go/pkg/cloudevents/transport/http"
+	configutils "github.com/keptn/go-utils/pkg/configuration-service/utils"
 	keptnevents "github.com/keptn/go-utils/pkg/events"
 	keptnutils "github.com/keptn/go-utils/pkg/utils"
 
@@ -52,13 +54,16 @@ const (
 	errorNotAllCollsDumped  = "not all collections were dumped/restored"
 	errorDumpedFiles        = "unable to get dumped files"
 	errorCollectionNotFound = "could not find collection %s in dump directory"
+
+	configservice = "CONFIGURATION_SERVICE"
 )
 
 // DatabaseInfo groups information from a database.
 type DatabaseInfo struct {
 	sourceDB    string
 	targetDB    string
-	host        string
+	sourceHost  string
+	targetHost  string
 	port        string
 	dumpDir     string
 	collections []string
@@ -98,46 +103,73 @@ func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 	}
 
 	service := strings.ToUpper(e.Service) // in our demo example, this will be carts --> toUpper: CARTS
-	sourceDB := os.Getenv(service + "_SOURCEDB")
-	targetDB := os.Getenv(service + "_TARGETDB")
-	host := os.Getenv(service + "_DEFAULT_HOST")
-	port := os.Getenv(service + "_DEFAULT_PORT")
 
+	var namespace string
+	if e.Stage == "" {
+		stage, _ := getFirstStage(e.Project)
+		namespace = e.Project + "-" + stage
+	} else {
+		namespace = e.Project + "-" + e.Stage
+	}
+
+	sourceDB := os.Getenv(service + "_SOURCEDB")
 	if sourceDB == "" {
 		stdLogger.Error(fmt.Sprintf("No source database configured for %s", service))
 		return
 	}
+	targetDB := os.Getenv(service + "_TARGETDB")
 	if targetDB == "" {
 		stdLogger.Error(fmt.Sprintf("No target database configured for %s", service))
 		return
 	}
-	if host == "" {
+	sourceHost := os.Getenv(service + "_SOURCE_HOST")
+	if sourceHost == "" {
 		stdLogger.Error(fmt.Sprintf("No host configured for %s", service))
 		return
 	}
-	if isValidPort(port) {
-		stdLogger.Error(fmt.Sprintf("Invalid port \"%s\" configured for %s", port, service))
+	targetHost := os.Getenv(service + "_TARGET_HOST")
+	if targetHost == "" {
+		stdLogger.Error(fmt.Sprintf("No host configured for %s", service))
 		return
 	}
+	defaultPort := os.Getenv(service + "_PORT")
+	//if isValidPort(defaultPort) { //TODO: check isValidPort?
+	//	stdLogger.Error(fmt.Sprintf("Invalid port \"%s\" configured for %s", defaultPort, service))
+	//	return
+	//}
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    sourceDB,
 		targetDB:    targetDB,
-		host:        host,
-		port:        port,
+		sourceHost:  sourceHost + "." + namespace,
+		targetHost:  targetHost + "." + namespace,
+		port:        defaultPort,
 		dumpDir:     os.Getenv("DUMP_DIR"),
 		collections: getCollections(os.Getenv(service + "_COLLECTIONS")),
 		args: []string{
 			mr.DropOption,
+			"--host=" + targetHost + "." + namespace + ":" + defaultPort,
 		},
 	}
+
+	fmt.Println("target host: " + dbInfo.args[1])
+
 	StartTimer()
+
+	stdLogger.Debug(fmt.Sprintf("start mongo dump"))
 	if err := executeMongoDump(dbInfo); err != nil {
 		stdLogger.Error(fmt.Sprintf("Failed to execute mongo dump on database  %s: %s", dbInfo.sourceDB, err.Error()))
+		return
 	}
+	stdLogger.Debug(fmt.Sprintf("mongo dump done"))
+
+	stdLogger.Debug(fmt.Sprintf("start mongo restore"))
 	if err := executeMongoRestore(dbInfo); err != nil {
 		stdLogger.Error(fmt.Sprintf("Failed to execute mongo restore on database  %s: %s", dbInfo.targetDB, err.Error()))
+		return
 	}
+	stdLogger.Debug(fmt.Sprintf("mongo restore done"))
+
 	stdLogger.Debug(fmt.Sprintf("Duration of snapshot synchronization: %s", GetDuration()))
 }
 
@@ -164,12 +196,22 @@ func _main(args []string, env envConfig) int {
 }
 
 // getDatabase returns a Database instance.
-func getDatabase(ctx context.Context, dbInfo *DatabaseInfo) (*mongo.Database, error) {
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://"+dbInfo.host+":"+dbInfo.port))
+func getDatabase(ctx context.Context, dbInfo *DatabaseInfo, host string) (*mongo.Database, error) {
+	var hostURL string
+	var db string
+	if host == "source" {
+		hostURL = dbInfo.sourceHost
+		db = dbInfo.sourceDB
+	} else {
+		hostURL = dbInfo.targetHost
+		db = dbInfo.targetDB
+	}
+
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://"+hostURL+":"+dbInfo.port)) //mongodb://carts-db:27017/carts-db
 	if err != nil {
 		return nil, err
 	}
-	return client.Database(dbInfo.sourceDB), nil
+	return client.Database(db), nil
 }
 
 // getCollections converts a string with collection names to a string array.
@@ -188,7 +230,7 @@ func getCollections(collections string) []string {
 // getMongoDump returns an initialized MongoDump object.
 func getMongoDump(dbInfo *DatabaseInfo) *md.MongoDump {
 	connection := &commonopts.Connection{
-		Host: dbInfo.host,
+		Host: dbInfo.sourceHost,
 		Port: dbInfo.port,
 	}
 
@@ -228,9 +270,9 @@ func executeMongoDump(dbInfo *DatabaseInfo) error {
 			}
 		}
 	}
-	if err := assertDatabaseConsistency(dbInfo); err != nil {
-		return err
-	}
+	//if err := assertDatabaseConsistency(dbInfo, "source"); err != nil {
+	//	return err
+	//}
 	return nil
 }
 
@@ -240,9 +282,11 @@ func initAndDump(dbInfo *DatabaseInfo, col string) error {
 	mongoDump.ToolOptions.Collection = col
 
 	if err := mongoDump.Init(); err != nil {
+		fmt.Println("mongo init failed")
 		return err
 	}
 	if err := mongoDump.Dump(); err != nil {
+		fmt.Println("mongo dump failed")
 		return err
 	}
 	return nil
@@ -251,7 +295,6 @@ func initAndDump(dbInfo *DatabaseInfo, col string) error {
 // getMongoRestore returns an initialized MongoRestore object.
 func getMongoRestore(database string, targetDir string, args []string) (*mr.MongoRestore, error) {
 	opts, err := mr.ParseOptions(args, "", "")
-
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +310,6 @@ func getMongoRestore(database string, targetDir string, args []string) (*mr.Mong
 
 // executeMongoRestore processes a restore operation.
 func executeMongoRestore(dbInfo *DatabaseInfo) error {
-
 	if len(dbInfo.collections) == 0 {
 		targetDir := dbInfo.dumpDir + "/" + dbInfo.sourceDB
 		if err := initAndRestore(dbInfo.targetDB, targetDir, dbInfo.args); err != nil {
@@ -281,9 +323,9 @@ func executeMongoRestore(dbInfo *DatabaseInfo) error {
 			}
 		}
 	}
-	if err := assertDatabaseConsistency(dbInfo); err != nil {
-		return err
-	}
+	//if err := assertDatabaseConsistency(dbInfo, "target"); err != nil {
+	//	return err
+	//}
 	return nil
 }
 
@@ -301,8 +343,8 @@ func initAndRestore(dbname string, targetDir string, args []string) error {
 
 // assertDatabaseConsistency checks if all collections in the directory are
 // available also in the database.
-func assertDatabaseConsistency(dbInfo *DatabaseInfo) error {
-	collectionNamesDB, err := getCollectionNames(dbInfo)
+func assertDatabaseConsistency(dbInfo *DatabaseInfo, host string) error {
+	collectionNamesDB, err := getCollectionNames(dbInfo, host)
 	if err != nil {
 		return err
 	}
@@ -354,9 +396,9 @@ func assertDatabaseConsistency(dbInfo *DatabaseInfo) error {
 }
 
 //getCollectionNames returns the collection names from a database.
-func getCollectionNames(dbInfo *DatabaseInfo) ([]string, error) {
+func getCollectionNames(dbInfo *DatabaseInfo, host string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	db, err := getDatabase(ctx, dbInfo)
+	db, err := getDatabase(ctx, dbInfo, host)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -399,4 +441,25 @@ func StartTimer() {
 // GetDuration returns the time passed since the timer started
 func GetDuration() time.Duration {
 	return time.Since(timer)
+}
+
+func getFirstStage(project string) (string, error) {
+	url, err := url.Parse(os.Getenv(configservice))
+	if err != nil {
+		return "", fmt.Errorf("Failed to retrieve value from ENVIRONMENT_VARIABLE: %s", configservice)
+	}
+
+	if url.Scheme == "" {
+		url.Scheme = "http"
+	}
+
+	resourceHandler := configutils.NewResourceHandler(url.String())
+	handler := keptnutils.NewKeptnHandler(resourceHandler)
+
+	shipyard, err := handler.GetShipyard(project)
+	if err != nil {
+		return "", err
+	}
+
+	return shipyard.Stages[0].Name, nil
 }
