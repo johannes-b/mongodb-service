@@ -27,8 +27,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
 
-	commonopts "github.com/mongodb/mongo-tools-common/options"
-	md "github.com/mongodb/mongo-tools/mongodump"
 	mr "github.com/mongodb/mongo-tools/mongorestore"
 )
 
@@ -124,12 +122,12 @@ func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 	}
 	sourceHost := os.Getenv(service + "_SOURCE_HOST")
 	if sourceHost == "" {
-		stdLogger.Error(fmt.Sprintf("No host configured for %s", service))
+		stdLogger.Error(fmt.Sprintf("No source host configured for %s", service))
 		return
 	}
 	targetHost := os.Getenv(service + "_TARGET_HOST")
 	if targetHost == "" {
-		stdLogger.Error(fmt.Sprintf("No host configured for %s", service))
+		stdLogger.Error(fmt.Sprintf("No target host configured for %s", service))
 		return
 	}
 	defaultPort := os.Getenv(service + "_PORT")
@@ -225,120 +223,6 @@ func getCollections(collections string) []string {
 		colArr[i] = part
 	}
 	return colArr
-}
-
-// getMongoDump returns an initialized MongoDump object.
-func getMongoDump(dbInfo *DatabaseInfo) *md.MongoDump {
-	connection := &commonopts.Connection{
-		Host: dbInfo.sourceHost,
-		Port: dbInfo.port,
-	}
-
-	toolOptions := &commonopts.ToolOptions{
-		Connection: connection,
-		Namespace:  &commonopts.Namespace{DB: dbInfo.sourceDB},
-		Auth: &commonopts.Auth{
-			Username: "",
-			Password: "",
-		},
-		URI: &commonopts.URI{},
-	}
-
-	inputOptions := &md.InputOptions{}
-	outputOptions := &md.OutputOptions{
-		NumParallelCollections: 1,
-		Out:                    dbInfo.dumpDir,
-	}
-
-	return &md.MongoDump{
-		ToolOptions:   toolOptions,
-		InputOptions:  inputOptions,
-		OutputOptions: outputOptions,
-	}
-}
-
-// executeMongoDump processes a mongodump operation.
-func executeMongoDump(dbInfo *DatabaseInfo) error {
-	if len(dbInfo.collections) == 0 { //dump all collections
-		if err := initAndDump(dbInfo, ""); err != nil {
-			return err
-		}
-	} else {
-		for _, col := range dbInfo.collections {
-			if err := initAndDump(dbInfo, col); err != nil {
-				return err
-			}
-		}
-	}
-	//if err := assertDatabaseConsistency(dbInfo, "source"); err != nil {
-	//	return err
-	//}
-	return nil
-}
-
-// initAndDump initializes a MongoDump Object and restores collections.
-func initAndDump(dbInfo *DatabaseInfo, col string) error {
-	mongoDump := getMongoDump(dbInfo)
-	mongoDump.ToolOptions.Collection = col
-
-	if err := mongoDump.Init(); err != nil {
-		fmt.Println("mongo init failed")
-		return err
-	}
-	if err := mongoDump.Dump(); err != nil {
-		fmt.Println("mongo dump failed")
-		return err
-	}
-	return nil
-}
-
-// getMongoRestore returns an initialized MongoRestore object.
-func getMongoRestore(database string, targetDir string, args []string) (*mr.MongoRestore, error) {
-	opts, err := mr.ParseOptions(args, "", "")
-	if err != nil {
-		return nil, err
-	}
-
-	restore, err := mr.New(opts)
-	if err != nil {
-		return nil, err
-	}
-	restore.TargetDirectory = targetDir
-	restore.NSOptions.DB = database
-	return restore, nil
-}
-
-// executeMongoRestore processes a restore operation.
-func executeMongoRestore(dbInfo *DatabaseInfo) error {
-	if len(dbInfo.collections) == 0 {
-		targetDir := dbInfo.dumpDir + "/" + dbInfo.sourceDB
-		if err := initAndRestore(dbInfo.targetDB, targetDir, dbInfo.args); err != nil {
-			return err
-		}
-	} else {
-		for _, col := range dbInfo.collections {
-			targetDir := dbInfo.dumpDir + "/" + dbInfo.sourceDB + "/" + col + ".bson"
-			if err := initAndRestore(dbInfo.targetDB, targetDir, dbInfo.args); err != nil {
-				return err
-			}
-		}
-	}
-	//if err := assertDatabaseConsistency(dbInfo, "target"); err != nil {
-	//	return err
-	//}
-	return nil
-}
-
-// initAndRestore initializes a MongoRestore Object and restores collections.
-func initAndRestore(dbname string, targetDir string, args []string) error {
-	restore, err := getMongoRestore(dbname, targetDir, args)
-	if err != nil {
-		return err
-	}
-	if result := restore.Restore(); result.Err != nil {
-		return result.Err
-	}
-	return nil
 }
 
 // assertDatabaseConsistency checks if all collections in the directory are
