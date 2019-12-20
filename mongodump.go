@@ -11,7 +11,7 @@ import (
 func getMongoDump(dbInfo *DatabaseInfo) *md.MongoDump {
 	connection := &commonopts.Connection{
 		Host: dbInfo.sourceHost,
-		Port: dbInfo.port,
+		Port: dbInfo.sourcePort,
 	}
 
 	toolOptions := &commonopts.ToolOptions{
@@ -66,8 +66,9 @@ func executeMongoDump(dbInfo *DatabaseInfo) error {
 			}
 		}
 	}
-	//if err := assertDatabaseConsistency(dbInfo, "source"); err != nil {
-	//	return err
-	//}
+	fmt.Println ("Dumped database successfully. Starting with file check...")
+	if err := assertDatabaseConsistency(dbInfo, "source"); err != nil {
+		return err
+	}
 	return nil
 }

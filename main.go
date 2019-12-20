@@ -10,7 +10,6 @@ import (
 	"os"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -62,7 +61,8 @@ type DatabaseInfo struct {
 	targetDB    string
 	sourceHost  string
 	targetHost  string
-	port        string
+	sourcePort  string
+	targetPort  string
 	dumpDir     string
 	collections []string
 	args        []string
@@ -109,6 +109,7 @@ func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 	} else {
 		namespace = e.Project + "-" + e.Stage
 	}
+	stdLogger.Debug(fmt.Sprintf("namespace: %s", namespace))
 
 	sourceDB := os.Getenv(service + "_SOURCEDB")
 	if sourceDB == "" {
@@ -130,33 +131,37 @@ func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 		stdLogger.Error(fmt.Sprintf("No target host configured for %s", service))
 		return
 	}
-	defaultPort := os.Getenv(service + "_PORT")
-	//if isValidPort(defaultPort) { //TODO: check isValidPort?
-	//	stdLogger.Error(fmt.Sprintf("Invalid port \"%s\" configured for %s", defaultPort, service))
-	//	return
-	//}
+	sourcePort := os.Getenv(service + "_SOURCE_PORT")
+	if sourcePort == "" {
+		stdLogger.Error(fmt.Sprintf("Invalid source port \"%s\" configured for %s", defaultPort, service))
+		return
+	}
+	targetPort := os.Getenv(service + "_TARGET_PORT")
+	if targetPort == "" {
+		stdLogger.Error(fmt.Sprintf("Invalid target port \"%s\" configured for %s", defaultPort, service))
+		return
+	}
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    sourceDB,
 		targetDB:    targetDB,
 		sourceHost:  sourceHost + "." + namespace,
 		targetHost:  targetHost + "." + namespace,
-		port:        defaultPort,
+		sourcePort:  sourcePort,
+		targetPort:  targetPort,
 		dumpDir:     os.Getenv("DUMP_DIR"),
 		collections: getCollections(os.Getenv(service + "_COLLECTIONS")),
 		args: []string{
 			mr.DropOption,
-			"--host=" + targetHost + "." + namespace + ":" + defaultPort,
+			"--host=" + targetHost + "." + namespace + ":" + targetPort,
 		},
 	}
-
-	fmt.Println("target host: " + dbInfo.args[1])
 
 	StartTimer()
 
 	stdLogger.Debug(fmt.Sprintf("start mongo dump"))
 	if err := executeMongoDump(dbInfo); err != nil {
-		stdLogger.Error(fmt.Sprintf("Failed to execute mongo dump on database  %s: %s", dbInfo.sourceDB, err.Error()))
+		stdLogger.Error(fmt.Sprintf("Failed to execute mongo dump on database %s: %s", dbInfo.sourceDB, err.Error()))
 		return
 	}
 	stdLogger.Debug(fmt.Sprintf("mongo dump done"))
@@ -197,15 +202,20 @@ func _main(args []string, env envConfig) int {
 func getDatabase(ctx context.Context, dbInfo *DatabaseInfo, host string) (*mongo.Database, error) {
 	var hostURL string
 	var db string
+	var port string
 	if host == "source" {
 		hostURL = dbInfo.sourceHost
 		db = dbInfo.sourceDB
+		port = dbInfo.sourcePort
 	} else {
 		hostURL = dbInfo.targetHost
 		db = dbInfo.targetDB
+		port = dbInfo.targetPort
 	}
+	//TODO change here
+	fmt.Printf("port: %s", port)
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://"+hostURL+":"+dbInfo.port)) //mongodb://carts-db:27017/carts-db
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://"+hostURL+":"+port)) //mongodb://carts-db:27017
 	if err != nil {
 		return nil, err
 	}
@@ -276,6 +286,7 @@ func assertDatabaseConsistency(dbInfo *DatabaseInfo, host string) error {
 			}
 		}
 	}
+	fmt.Println("Concluded file check successfully")
 	return nil
 }
 
@@ -295,6 +306,7 @@ func getCollectionNames(dbInfo *DatabaseInfo, host string) ([]string, error) {
 // getFiles returns the files from a dump directory.
 func getDumpedFiles(dbInfo *DatabaseInfo) ([]os.FileInfo, error) {
 	dumpdir := dbInfo.dumpDir + "/" + dbInfo.sourceDB
+	fmt.Printf("Dumpdir: %s\n", dumpdir)
 	return ioutil.ReadDir(dumpdir)
 }
 
@@ -306,15 +318,6 @@ func contains(arr []string, s string) bool {
 		}
 	}
 	return false
-}
-
-// isValidPort checks if a given port is valid
-func isValidPort(port string) bool {
-	n, err := strconv.Atoi(port)
-	if err != nil {
-		return false
-	}
-	return n > 0 && n < 65536
 }
 
 // StartTimer sets the current time for time measurement

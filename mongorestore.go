@@ -16,7 +16,7 @@ func getMongoRestore(dbInfo *DatabaseInfo, targetDir string) (*mr.MongoRestore, 
 
 	connection := &commonopts.Connection{
 		Host: dbInfo.targetHost,
-		Port: dbInfo.port,
+		Port: dbInfo.targetPort,
 	}
 
 	opts.ToolOptions = &commonopts.ToolOptions{
@@ -66,8 +66,8 @@ func executeMongoRestore(dbInfo *DatabaseInfo) error {
 			}
 		}
 	}
-	//if err := assertDatabaseConsistency(dbInfo, "target"); err != nil {
-	//	return err
-	//}
+	if err := assertDatabaseConsistency(dbInfo, "target"); err != nil {
+		return err
+	}
 	return nil
 }

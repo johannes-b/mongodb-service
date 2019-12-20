@@ -10,7 +10,8 @@ data:
   # configuration for carts service
   CARTS_SOURCEDB: "carts-db"
   CARTS_TARGETDB: "carts-db-canary"
-  CARTS_PORT: "27017"
+  CARTS_SOURCE_PORT: "27017"
+  CARTS_TARGET_PORT: "27017"
   CARTS_SOURCE_HOST: "carts-db"
   CARTS_TARGET_HOST: "carts-db-canary"
   CARTS_COLLECTIONS: "" 
