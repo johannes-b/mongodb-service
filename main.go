@@ -93,7 +93,7 @@ func gotEvent(ctx context.Context, event cloudevents.Event) error {
 func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 
 	stdLogger := keptnutils.NewLogger(shkeptncontext, event.Context.GetID(), "mongodb-service")
-	stdLogger.Debug("Database synchronization started")
+	stdLogger.Debug("Database synchronization started...")
 
 	e := &keptnevents.ConfigurationChangeEventData{}
 	if err := event.DataAs(e); err != nil {
@@ -113,22 +113,22 @@ func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 
 	sourceDB := os.Getenv(service + "_SOURCEDB")
 	if sourceDB == "" {
-		stdLogger.Error(fmt.Sprintf("No source database configured for %s", service))
+		stdLogger.Error(fmt.Sprintf("Invalid source database configured for %s", service))
 		return
 	}
 	targetDB := os.Getenv(service + "_TARGETDB")
 	if targetDB == "" {
-		stdLogger.Error(fmt.Sprintf("No target database configured for %s", service))
+		stdLogger.Error(fmt.Sprintf("Invalid target database configured for %s", service))
 		return
 	}
 	sourceHost := os.Getenv(service + "_SOURCE_HOST")
 	if sourceHost == "" {
-		stdLogger.Error(fmt.Sprintf("No source host configured for %s", service))
+		stdLogger.Error(fmt.Sprintf("Invalid source host configured for %s", service))
 		return
 	}
 	targetHost := os.Getenv(service + "_TARGET_HOST")
 	if targetHost == "" {
-		stdLogger.Error(fmt.Sprintf("No target host configured for %s", service))
+		stdLogger.Error(fmt.Sprintf("Invalid target host configured for %s", service))
 		return
 	}
 	sourcePort := os.Getenv(service + "_SOURCE_PORT")
@@ -153,27 +153,26 @@ func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 		collections: getCollections(os.Getenv(service + "_COLLECTIONS")),
 		args: []string{
 			mr.DropOption,
-			"--host=" + targetHost + "." + namespace + ":" + targetPort,
 		},
 	}
 
 	StartTimer()
 
-	stdLogger.Debug(fmt.Sprintf("start mongo dump"))
+	stdLogger.Debug(fmt.Sprintf("Starting to execute mongo dump on database %s on host %s...", dbInfo.sourceDB, dbInfo.sourceHost))
 	if err := executeMongoDump(dbInfo); err != nil {
 		stdLogger.Error(fmt.Sprintf("Failed to execute mongo dump on database %s: %s", dbInfo.sourceDB, err.Error()))
-		return
+	} else {
+		stdLogger.Debug("Concluded mongo dump successfully!")
+		stdLogger.Debug(fmt.Sprintf("Starting to execute mongo restore on database %s on host %s...", dbInfo.targetDB, dbInfo.targetHost))
+		if err := executeMongoRestore(dbInfo); err != nil {
+			stdLogger.Error(fmt.Sprintf("Failed to execute mongo restore on database  %s: %s", dbInfo.targetDB, err.Error()))
+		} else {
+			stdLogger.Debug("Concluded mongo restore successfully!")
+			stdLogger.Debug(fmt.Sprintf("Duration of snapshot synchronization: %s", GetDuration()))
+		}
 	}
-	stdLogger.Debug(fmt.Sprintf("mongo dump done"))
-
-	stdLogger.Debug(fmt.Sprintf("start mongo restore"))
-	if err := executeMongoRestore(dbInfo); err != nil {
-		stdLogger.Error(fmt.Sprintf("Failed to execute mongo restore on database  %s: %s", dbInfo.targetDB, err.Error()))
-		return
-	}
-	stdLogger.Debug(fmt.Sprintf("mongo restore done"))
-
-	stdLogger.Debug(fmt.Sprintf("Duration of snapshot synchronization: %s", GetDuration()))
+	stdLogger.Debug("Deleting dump directory...")
+	os.RemoveAll(dbInfo.dumpDir + "/")
 }
 
 func _main(args []string, env envConfig) int {
@@ -212,10 +211,10 @@ func getDatabase(ctx context.Context, dbInfo *DatabaseInfo, host string) (*mongo
 		db = dbInfo.targetDB
 		port = dbInfo.targetPort
 	}
-	//TODO change here
-	fmt.Printf("port: %s", port)
+	uri := "mongodb://" + hostURL + ":" + port //mongodb://carts-db:27017
+	fmt.Printf("Uri: %s\n", uri)
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://"+hostURL+":"+port)) //mongodb://carts-db:27017
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
 	if err != nil {
 		return nil, err
 	}

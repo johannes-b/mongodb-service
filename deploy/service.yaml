@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: mongodb-service
-        image: frgsra/mongodb-service:0.0.9
+        image: frgsra/mongodb-service:0.0.13
         ports:
         - containerPort: 8080
         resources:
