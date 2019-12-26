@@ -37,15 +37,16 @@ func getMongoRestore(dbInfo *DatabaseInfo, targetDir string) (*mr.MongoRestore, 
 	return restore, nil
 }
 
-// initAndRestore initializes a MongoRestore Object and restores collections.
+// initAndRestore initializes a MongoRestore Object and executes the
+// mongo restore operation.
 func initAndRestore(dbInfo *DatabaseInfo, targetDir string) error {
 	restore, err := getMongoRestore(dbInfo, targetDir)
 	if err != nil {
-		fmt.Printf("mongo restore initialization failed: %s", err)
+		fmt.Printf("Mongo restore initialization failed: %s", err)
 		return err
 	}
 	if result := restore.Restore(); result.Err != nil {
-		fmt.Printf("mongo restore failed: %s", result.Err)
+		fmt.Printf("Mongo restore failed: %s", result.Err)
 		return result.Err
 	}
 	return nil
@@ -66,7 +67,8 @@ func executeMongoRestore(dbInfo *DatabaseInfo) error {
 			}
 		}
 	}
-	if err := assertDatabaseConsistency(dbInfo, "target"); err != nil {
+	fmt.Println("Restored database successfully. Starting with the validation...")
+	if err := validate(dbInfo, "target"); err != nil {
 		return err
 	}
 	return nil

@@ -85,12 +85,13 @@ func gotEvent(ctx context.Context, event cloudevents.Event) error {
 		return errors.New(errorMsg)
 	}
 
-	go syncTestDB(event, shkeptncontext)
+	go syncDatabases(event, shkeptncontext)
 
 	return nil
 }
 
-func syncTestDB(event cloudevents.Event, shkeptncontext string) {
+// syncDatabases synchronizes a test database with the data of another database
+func syncDatabases(event cloudevents.Event, shkeptncontext string) {
 
 	stdLogger := keptnutils.NewLogger(shkeptncontext, event.Context.GetID(), "mongodb-service")
 	stdLogger.Debug("Database synchronization started...")
@@ -133,12 +134,12 @@ func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 	}
 	sourcePort := os.Getenv(service + "_SOURCE_PORT")
 	if sourcePort == "" {
-		stdLogger.Error(fmt.Sprintf("Invalid source port \"%s\" configured for %s", defaultPort, service))
+		stdLogger.Error(fmt.Sprintf("Invalid source port %s configured for %s", defaultPort, service))
 		return
 	}
 	targetPort := os.Getenv(service + "_TARGET_PORT")
 	if targetPort == "" {
-		stdLogger.Error(fmt.Sprintf("Invalid target port \"%s\" configured for %s", defaultPort, service))
+		stdLogger.Error(fmt.Sprintf("Invalid target port %s configured for %s", defaultPort, service))
 		return
 	}
 
@@ -234,15 +235,15 @@ func getCollections(collections string) []string {
 	return colArr
 }
 
-// assertDatabaseConsistency checks if all collections in the directory are
-// available also in the database.
-func assertDatabaseConsistency(dbInfo *DatabaseInfo, host string) error {
+// validate checks if for every collection in the database
+// a json and a bson file exists in a directory.
+func validate(dbInfo *DatabaseInfo, host string) error {
 	collectionNamesDB, err := getCollectionNames(dbInfo, host)
 	if err != nil {
 		return err
 	}
 
-	files, err := getDumpedFiles(dbInfo)
+	files, err := getFilesFromDumpDir(dbInfo)
 	if err != nil {
 		return fmt.Errorf(errorDumpedFiles)
 	}
@@ -285,7 +286,7 @@ func assertDatabaseConsistency(dbInfo *DatabaseInfo, host string) error {
 			}
 		}
 	}
-	fmt.Println("Concluded file check successfully")
+	fmt.Println("Concluded validation successfully")
 	return nil
 }
 
@@ -302,8 +303,8 @@ func getCollectionNames(dbInfo *DatabaseInfo, host string) ([]string, error) {
 	return collections, err
 }
 
-// getFiles returns the files from a dump directory.
-func getDumpedFiles(dbInfo *DatabaseInfo) ([]os.FileInfo, error) {
+// getFilesFromDumpDir returns the files from a dump directory.
+func getFilesFromDumpDir(dbInfo *DatabaseInfo) ([]os.FileInfo, error) {
 	dumpdir := dbInfo.dumpDir + "/" + dbInfo.sourceDB
 	fmt.Printf("Dumpdir: %s\n", dumpdir)
 	return ioutil.ReadDir(dumpdir)
@@ -319,12 +320,12 @@ func contains(arr []string, s string) bool {
 	return false
 }
 
-// StartTimer sets the current time for time measurement
+// StartTimer sets the current time for time measurement.
 func StartTimer() {
 	timer = time.Now()
 }
 
-// GetDuration returns the time passed since the timer started
+// GetDuration returns the time passed since the timer started.
 func GetDuration() time.Duration {
 	return time.Since(timer)
 }

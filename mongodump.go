@@ -37,23 +37,24 @@ func getMongoDump(dbInfo *DatabaseInfo) *md.MongoDump {
 	}
 }
 
-// initAndDump initializes a MongoDump Object and restores collections.
+// initAndDump initializes a MongoDump Object and executes the
+// mongo dump operation.
 func initAndDump(dbInfo *DatabaseInfo, col string) error {
 	mongoDump := getMongoDump(dbInfo)
 	mongoDump.ToolOptions.Collection = col
 
 	if err := mongoDump.Init(); err != nil {
-		fmt.Printf("mongo dump initialization failed: %s", err)
+		fmt.Printf("Mongo dump initialization failed: %s", err)
 		return err
 	}
 	if err := mongoDump.Dump(); err != nil {
-		fmt.Printf("mongo dump failed: %s", err)
+		fmt.Printf("Mongo dump failed: %s", err)
 		return err
 	}
 	return nil
 }
 
-// executeMongoDump processes a mongodump operation.
+// executeMongoDump executes a mongodump operation.
 func executeMongoDump(dbInfo *DatabaseInfo) error {
 	if len(dbInfo.collections) == 0 { //dump all collections
 		if err := initAndDump(dbInfo, ""); err != nil {
@@ -66,8 +67,8 @@ func executeMongoDump(dbInfo *DatabaseInfo) error {
 			}
 		}
 	}
-	fmt.Println ("Dumped database successfully. Starting with file check...")
-	if err := assertDatabaseConsistency(dbInfo, "source"); err != nil {
+	fmt.Println("Dumped database successfully. Starting with the validation...")
+	if err := validate(dbInfo, "source"); err != nil {
 		return err
 	}
 	return nil
