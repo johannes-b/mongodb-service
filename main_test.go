@@ -18,7 +18,8 @@ func setEnvironmentVariables() {
 	//configuration for carts service
 	os.Setenv("CARTS_SOURCEDB", "carts-db") //84.0KB
 	os.Setenv("CARTS_TARGETDB", "carts-db-canary")
-	os.Setenv("CARTS_PORT", "27017")
+	os.Setenv("CARTS_SOURCE_PORT", "27017")
+	os.Setenv("CARTS_TARGET_PORT", "27017")
 	os.Setenv("CARTS_SOURCE_HOST", "localhost")
 	os.Setenv("CARTS_TARGET_HOST", "localhost")
 	os.Setenv("CARTS_COLLECTIONS", "")
@@ -26,7 +27,7 @@ func setEnvironmentVariables() {
 	os.Setenv("TRADES_SOURCEDB", "trades-db") //1.2MB
 	os.Setenv("TRADES_TARGETDB", "trades-db-test")
 	os.Setenv("TRADES_PORT", "27017")
-	os.Setenv("TRADES_HOST", "")
+	os.Setenv("TRADES_HOST", "localhost")
 
 	//additional env variables for test cases
 	os.Setenv("DUMP_DIR_ONE_COLLECTION", "./dumpdir/dumpDirOneCollection")
@@ -51,7 +52,7 @@ func assertError(t *testing.T, expectedMsg string, actualError error) {
 func TestMain(m *testing.M) {
 	setEnvironmentVariables()
 	m.Run()
-	//os.RemoveAll("./dumpdir/")
+	os.RemoveAll("./dumpdir/")
 }
 
 // TestMongoDriver instantiates the mongo driver.
@@ -63,10 +64,9 @@ func TestMongoDriver(t *testing.T) {
 	dbInfo := &DatabaseInfo{
 		sourceDB:   os.Getenv("CARTS_SOURCEDB"),
 		sourceHost: os.Getenv("CARTS_SOURCE_HOST"),
-		targetHost: os.Getenv("CARTS_TARGET_HOST"),
-		port:       os.Getenv("CARTS_PORT"),
+		sourcePort: os.Getenv("CARTS_SOURCE_PORT"),
 	}
-	db, err := getDatabase(ctx, dbInfo, dbInfo.sourceHost)
+	db, err := getDatabase(ctx, dbInfo, "source")
 	if err != nil {
 		cancel()
 		t.Errorf("Error message: %s", err)
@@ -91,7 +91,8 @@ func TestMongoDumpAllCollections(t *testing.T) {
 		sourceDB:    os.Getenv("CARTS_SOURCEDB"),
 		sourceHost:  os.Getenv("CARTS_SOURCE_HOST"),
 		targetHost:  os.Getenv("CARTS_TARGET_HOST"),
-		port:        os.Getenv("CARTS_PORT"),
+		sourcePort:  os.Getenv("CARTS_SOURCE_PORT"),
+		targetPort:  os.Getenv("CARTS_TARGET_PORT"),
 		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
 		collections: getCollections(os.Getenv("CARTS_COLLECTIONS")),
 	}
@@ -111,7 +112,8 @@ func TestMongoDumpOneCollection(t *testing.T) {
 		sourceDB:    os.Getenv("CARTS_SOURCEDB"),
 		sourceHost:  os.Getenv("CARTS_SOURCE_HOST"),
 		targetHost:  os.Getenv("CARTS_TARGET_HOST"),
-		port:        os.Getenv("CARTS_PORT"),
+		sourcePort:  os.Getenv("CARTS_SOURCE_PORT"),
+		targetPort:  os.Getenv("CARTS_TARGET_PORT"),
 		dumpDir:     os.Getenv("DUMP_DIR_ONE_COLLECTION"),
 		collections: getCollections(os.Getenv("CARTS_COLLECTIONS_2")),
 	}
@@ -131,7 +133,8 @@ func TestMongoDumpMultipleCollections(t *testing.T) {
 		sourceDB:    os.Getenv("CARTS_SOURCEDB"),
 		sourceHost:  os.Getenv("CARTS_SOURCE_HOST"),
 		targetHost:  os.Getenv("CARTS_TARGET_HOST"),
-		port:        os.Getenv("CARTS_PORT"),
+		sourcePort:  os.Getenv("CARTS_SOURCE_PORT"),
+		targetPort:  os.Getenv("CARTS_TARGET_PORT"),
 		dumpDir:     os.Getenv("DUMP_DIR_MULTIPLE_COLLECTIONS"),
 		collections: getCollections(os.Getenv("CARTS_COLLECTIONS_3")),
 	}
@@ -152,7 +155,8 @@ func TestMongoRestoreAllCollections(t *testing.T) {
 		targetDB:    "carts-db-test-1",
 		sourceHost:  os.Getenv("CARTS_SOURCE_HOST"),
 		targetHost:  os.Getenv("CARTS_TARGET_HOST"),
-		port:        os.Getenv("CARTS_PORT"),
+		sourcePort:  os.Getenv("CARTS_SOURCE_PORT"),
+		targetPort:  os.Getenv("CARTS_TARGET_PORT"),
 		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
 		collections: getCollections(os.Getenv("CARTS_COLLECTIONS")),
 		args: []string{
@@ -176,7 +180,8 @@ func TestMongoRestoreOneCollection(t *testing.T) {
 		targetDB:    os.Getenv("CARTS_TARGETDB"),
 		sourceHost:  os.Getenv("CARTS_SOURCE_HOST"),
 		targetHost:  os.Getenv("CARTS_TARGET_HOST"),
-		port:        os.Getenv("CARTS_PORT"),
+		sourcePort:  os.Getenv("CARTS_SOURCE_PORT"),
+		targetPort:  os.Getenv("CARTS_TARGET_PORT"),
 		dumpDir:     os.Getenv("DUMP_DIR_ONE_COLLECTION"),
 		collections: getCollections(os.Getenv("CARTS_COLLECTIONS_2")),
 		args: []string{
@@ -200,7 +205,8 @@ func TestMongoRestoreMultipleCollections(t *testing.T) {
 		targetDB:    os.Getenv("CARTS_TARGETDB"),
 		sourceHost:  os.Getenv("CARTS_SOURCE_HOST"),
 		targetHost:  os.Getenv("CARTS_TARGET_HOST"),
-		port:        os.Getenv("CARTS_PORT"),
+		sourcePort:  os.Getenv("CARTS_SOURCE_PORT"),
+		targetPort:  os.Getenv("CARTS_TARGET_PORT"),
 		dumpDir:     os.Getenv("DUMP_DIR_MULTIPLE_COLLECTIONS"),
 		collections: getCollections(os.Getenv("CARTS_COLLECTIONS_3")),
 		args:        []string{},
@@ -222,7 +228,8 @@ func TestDatabaseSync(t *testing.T) {
 		targetDB:    os.Getenv("CARTS_TARGETDB"),
 		sourceHost:  os.Getenv("CARTS_SOURCE_HOST"),
 		targetHost:  os.Getenv("CARTS_TARGET_HOST"),
-		port:        os.Getenv("CARTS_PORT"),
+		sourcePort:  os.Getenv("CARTS_SOURCE_PORT"),
+		targetPort:  os.Getenv("CARTS_TARGET_PORT"),
 		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
 		collections: getCollections(os.Getenv("CARTS_COLLECTIONS")),
 		args: []string{
@@ -247,8 +254,9 @@ func TestLargeDatabase(t *testing.T) {
 		sourceDB:    os.Getenv("TRADES_SOURCEDB"),
 		targetDB:    os.Getenv("TRADES_TARGETDB"),
 		sourceHost:  os.Getenv("TRADES_SOURCE_HOST"),
-		targetHost:  os.Getenv("CARTS_TARGET_HOST"),
-		port:        os.Getenv("TRADES_PORT"),
+		targetHost:  os.Getenv("TRADES_TARGET_HOST"),
+		sourcePort:  os.Getenv("TRADES_PORT"),
+		targetPort:  os.Getenv("TRADES_PORT"),
 		dumpDir:     os.Getenv("DUMP_DIR_TRADES_DB"),
 		collections: getCollections(""),
 		args: []string{
@@ -273,7 +281,8 @@ func TestNotExistingSourceDB(t *testing.T) {
 		sourceDB:    "db1",
 		sourceHost:  os.Getenv("CARTS_SOURCE_HOST"),
 		targetHost:  os.Getenv("CARTS_TARGET_HOST"),
-		port:        os.Getenv("CARTS_PORT"),
+		sourcePort:  os.Getenv("CARTS_SOURCE_PORT"),
+		targetPort:  os.Getenv("CARTS_TARGET_PORT"),
 		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
 		collections: getCollections(os.Getenv("CARTS_COLLECTIONS")),
 	}
@@ -291,7 +300,8 @@ func TestNotAllCollectionsDumped1(t *testing.T) {
 		targetDB:    os.Getenv("CARTS_TARGETDB"),
 		sourceHost:  os.Getenv("CARTS_SOURCE_HOST"),
 		targetHost:  os.Getenv("CARTS_TARGET_HOST"),
-		port:        os.Getenv("CARTS_PORT"),
+		sourcePort:  os.Getenv("CARTS_SOURCE_PORT"),
+		targetPort:  os.Getenv("CARTS_TARGET_PORT"),
 		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
 		collections: getCollections(os.Getenv("CARTS_COLLECTIONS")),
 		args: []string{
@@ -316,7 +326,8 @@ func TestNotAllCollectionsDumped2(t *testing.T) {
 		targetDB:    os.Getenv("CARTS_TARGETDB"),
 		sourceHost:  os.Getenv("CARTS_SOURCE_HOST"),
 		targetHost:  os.Getenv("CARTS_TARGET_HOST"),
-		port:        os.Getenv("CARTS_PORT"),
+		sourcePort:  os.Getenv("CARTS_SOURCE_PORT"),
+		targetPort:  os.Getenv("CARTS_TARGET_PORT"),
 		dumpDir:     os.Getenv("DUMP_DIR_ALL_COLLECTIONS"),
 		collections: getCollections(os.Getenv("CARTS_COLLECTIONS_2")),
 		args: []string{

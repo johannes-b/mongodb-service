@@ -10,7 +10,6 @@ import (
 	"os"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -62,7 +61,8 @@ type DatabaseInfo struct {
 	targetDB    string
 	sourceHost  string
 	targetHost  string
-	port        string
+	sourcePort  string
+	targetPort  string
 	dumpDir     string
 	collections []string
 	args        []string
@@ -85,15 +85,16 @@ func gotEvent(ctx context.Context, event cloudevents.Event) error {
 		return errors.New(errorMsg)
 	}
 
-	go syncTestDB(event, shkeptncontext)
+	go syncDatabases(event, shkeptncontext)
 
 	return nil
 }
 
-func syncTestDB(event cloudevents.Event, shkeptncontext string) {
+// syncDatabases synchronizes a test database with the data of another database
+func syncDatabases(event cloudevents.Event, shkeptncontext string) {
 
 	stdLogger := keptnutils.NewLogger(shkeptncontext, event.Context.GetID(), "mongodb-service")
-	stdLogger.Debug("Database synchronization started")
+	stdLogger.Debug("Database synchronization started...")
 
 	e := &keptnevents.ConfigurationChangeEventData{}
 	if err := event.DataAs(e); err != nil {
@@ -109,66 +110,70 @@ func syncTestDB(event cloudevents.Event, shkeptncontext string) {
 	} else {
 		namespace = e.Project + "-" + e.Stage
 	}
+	stdLogger.Debug(fmt.Sprintf("namespace: %s", namespace))
 
 	sourceDB := os.Getenv(service + "_SOURCEDB")
 	if sourceDB == "" {
-		stdLogger.Error(fmt.Sprintf("No source database configured for %s", service))
+		stdLogger.Error(fmt.Sprintf("Invalid source database configured for %s", service))
 		return
 	}
 	targetDB := os.Getenv(service + "_TARGETDB")
 	if targetDB == "" {
-		stdLogger.Error(fmt.Sprintf("No target database configured for %s", service))
+		stdLogger.Error(fmt.Sprintf("Invalid target database configured for %s", service))
 		return
 	}
 	sourceHost := os.Getenv(service + "_SOURCE_HOST")
 	if sourceHost == "" {
-		stdLogger.Error(fmt.Sprintf("No source host configured for %s", service))
+		stdLogger.Error(fmt.Sprintf("Invalid source host configured for %s", service))
 		return
 	}
 	targetHost := os.Getenv(service + "_TARGET_HOST")
 	if targetHost == "" {
-		stdLogger.Error(fmt.Sprintf("No target host configured for %s", service))
+		stdLogger.Error(fmt.Sprintf("Invalid target host configured for %s", service))
 		return
 	}
-	defaultPort := os.Getenv(service + "_PORT")
-	//if isValidPort(defaultPort) { //TODO: check isValidPort?
-	//	stdLogger.Error(fmt.Sprintf("Invalid port \"%s\" configured for %s", defaultPort, service))
-	//	return
-	//}
+	sourcePort := os.Getenv(service + "_SOURCE_PORT")
+	if sourcePort == "" {
+		stdLogger.Error(fmt.Sprintf("Invalid source port %s configured for %s", defaultPort, service))
+		return
+	}
+	targetPort := os.Getenv(service + "_TARGET_PORT")
+	if targetPort == "" {
+		stdLogger.Error(fmt.Sprintf("Invalid target port %s configured for %s", defaultPort, service))
+		return
+	}
 
 	dbInfo := &DatabaseInfo{
 		sourceDB:    sourceDB,
 		targetDB:    targetDB,
 		sourceHost:  sourceHost + "." + namespace,
 		targetHost:  targetHost + "." + namespace,
-		port:        defaultPort,
+		sourcePort:  sourcePort,
+		targetPort:  targetPort,
 		dumpDir:     os.Getenv("DUMP_DIR"),
 		collections: getCollections(os.Getenv(service + "_COLLECTIONS")),
 		args: []string{
 			mr.DropOption,
-			"--host=" + targetHost + "." + namespace + ":" + defaultPort,
 		},
 	}
 
-	fmt.Println("target host: " + dbInfo.args[1])
-
 	StartTimer()
 
-	stdLogger.Debug(fmt.Sprintf("start mongo dump"))
+	stdLogger.Debug(fmt.Sprintf("Starting to execute mongo dump on database %s on host %s...", dbInfo.sourceDB, dbInfo.sourceHost))
 	if err := executeMongoDump(dbInfo); err != nil {
-		stdLogger.Error(fmt.Sprintf("Failed to execute mongo dump on database  %s: %s", dbInfo.sourceDB, err.Error()))
-		return
+		stdLogger.Error(fmt.Sprintf("Failed to execute mongo dump on database %s: %s", dbInfo.sourceDB, err.Error()))
+	} else {
+		stdLogger.Debug("Concluded mongo dump successfully!")
+		stdLogger.Debug(fmt.Sprintf("Starting to execute mongo restore on database %s on host %s...", dbInfo.targetDB, dbInfo.targetHost))
+		if err := executeMongoRestore(dbInfo); err != nil {
+			stdLogger.Error(fmt.Sprintf("Failed to execute mongo restore on database  %s: %s", dbInfo.targetDB, err.Error()))
+		} else {
+			stdLogger.Debug("Concluded mongo restore successfully!")
+			stdLogger.Debug(fmt.Sprintf("Duration of snapshot synchronization: %s", GetDuration()))
+		}
 	}
-	stdLogger.Debug(fmt.Sprintf("mongo dump done"))
-
-	stdLogger.Debug(fmt.Sprintf("start mongo restore"))
-	if err := executeMongoRestore(dbInfo); err != nil {
-		stdLogger.Error(fmt.Sprintf("Failed to execute mongo restore on database  %s: %s", dbInfo.targetDB, err.Error()))
-		return
-	}
-	stdLogger.Debug(fmt.Sprintf("mongo restore done"))
-
-	stdLogger.Debug(fmt.Sprintf("Duration of snapshot synchronization: %s", GetDuration()))
+	stdLogger.Debug("Deleting dump directory...")
+	os.RemoveAll(dbInfo.dumpDir + "/")
 }
 
 func _main(args []string, env envConfig) int {
@@ -197,15 +202,20 @@ func _main(args []string, env envConfig) int {
 func getDatabase(ctx context.Context, dbInfo *DatabaseInfo, host string) (*mongo.Database, error) {
 	var hostURL string
 	var db string
+	var port string
 	if host == "source" {
 		hostURL = dbInfo.sourceHost
 		db = dbInfo.sourceDB
+		port = dbInfo.sourcePort
 	} else {
 		hostURL = dbInfo.targetHost
 		db = dbInfo.targetDB
+		port = dbInfo.targetPort
 	}
+	uri := "mongodb://" + hostURL + ":" + port //mongodb://carts-db:27017
+	fmt.Printf("Uri: %s\n", uri)
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://"+hostURL+":"+dbInfo.port)) //mongodb://carts-db:27017/carts-db
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
 	if err != nil {
 		return nil, err
 	}
@@ -225,15 +235,15 @@ func getCollections(collections string) []string {
 	return colArr
 }
 
-// assertDatabaseConsistency checks if all collections in the directory are
-// available also in the database.
-func assertDatabaseConsistency(dbInfo *DatabaseInfo, host string) error {
+// validate checks if for every collection in the database
+// a json and a bson file exists in a directory.
+func validate(dbInfo *DatabaseInfo, host string) error {
 	collectionNamesDB, err := getCollectionNames(dbInfo, host)
 	if err != nil {
 		return err
 	}
 
-	files, err := getDumpedFiles(dbInfo)
+	files, err := getFilesFromDumpDir(dbInfo)
 	if err != nil {
 		return fmt.Errorf(errorDumpedFiles)
 	}
@@ -276,6 +286,7 @@ func assertDatabaseConsistency(dbInfo *DatabaseInfo, host string) error {
 			}
 		}
 	}
+	fmt.Println("Concluded validation successfully")
 	return nil
 }
 
@@ -292,9 +303,10 @@ func getCollectionNames(dbInfo *DatabaseInfo, host string) ([]string, error) {
 	return collections, err
 }
 
-// getFiles returns the files from a dump directory.
-func getDumpedFiles(dbInfo *DatabaseInfo) ([]os.FileInfo, error) {
+// getFilesFromDumpDir returns the files from a dump directory.
+func getFilesFromDumpDir(dbInfo *DatabaseInfo) ([]os.FileInfo, error) {
 	dumpdir := dbInfo.dumpDir + "/" + dbInfo.sourceDB
+	fmt.Printf("Dumpdir: %s\n", dumpdir)
 	return ioutil.ReadDir(dumpdir)
 }
 
@@ -308,21 +320,12 @@ func contains(arr []string, s string) bool {
 	return false
 }
 
-// isValidPort checks if a given port is valid
-func isValidPort(port string) bool {
-	n, err := strconv.Atoi(port)
-	if err != nil {
-		return false
-	}
-	return n > 0 && n < 65536
-}
-
-// StartTimer sets the current time for time measurement
+// StartTimer sets the current time for time measurement.
 func StartTimer() {
 	timer = time.Now()
 }
 
-// GetDuration returns the time passed since the timer started
+// GetDuration returns the time passed since the timer started.
 func GetDuration() time.Duration {
 	return time.Since(timer)
 }
