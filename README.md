@@ -58,8 +58,28 @@ Optional parameters:
 
 ## Delete in your Kubernetes cluster
 
-To delete a deployed *mongodb-service*, use the file `service.yaml` in the deploy folder from this repository and delete the Kubernetes resources:
+To delete a deployed *mongodb-service*, use the resources in the deploy folder from this repository and delete the Kubernetes resources:
+
+1. PVC
+
+```console
+kubectl delete -f deploy/pvc.yaml
+```
+
+2. ConfigMap
+
+```console
+kubectl delete -f deploy/configmap.yaml
+```
+
+3. Service and Deplyoment
 
 ```console
 kubectl delete -f deploy/service.yaml
+```
+
+4. Event listener
+
+```console
+kubectl delete -f deploy/distributor.yaml
 ```
